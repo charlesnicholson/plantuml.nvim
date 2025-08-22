@@ -119,7 +119,6 @@ do
   end
 end
 
--- Updated HTML, CSS, and JavaScript content
 local html_content = [[
 <!doctype html>
 <html lang="en">
@@ -316,7 +315,6 @@ function M.update_diagram()
   if buffer_content:match("^%s*$") then
     return
   end
-  -- Fetches the full path of the file (:p) instead of just the tail (:t)
   local filename = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":p")
   if filename == "" then filename = "untitled.puml" end
 
@@ -337,6 +335,14 @@ end
 
 function M.is_running()
   return started
+end
+
+function M.open_browser()
+  if not started then
+    vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
+  end
+  
+  vim.ui.open("http://" .. config.host .. ":" .. config.http_port)
 end
 
 return M
