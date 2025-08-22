@@ -8,12 +8,23 @@ plantuml.start()
 
 local augroup = vim.api.nvim_create_augroup("PlantUMLViewer", { clear = true })
 
--- Pattern-based detection for efficiency
-vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnter" }, {
+-- Trigger on plantuml filetype (supports any file extension that sets filetype=plantuml)
+vim.api.nvim_create_autocmd("FileType", {
   group = augroup,
-  pattern = { "*.puml", "*.plantuml" },
+  pattern = "plantuml",
   callback = plantuml.update_diagram,
-  desc = "Update PlantUML diagram via WebSocket",
+  desc = "Update PlantUML diagram when filetype is set to plantuml",
+})
+
+-- Update diagram when plantuml files are saved
+vim.api.nvim_create_autocmd("BufWritePost", {
+  group = augroup,
+  callback = function()
+    if vim.bo.filetype == "plantuml" then
+      plantuml.update_diagram()
+    end
+  end,
+  desc = "Update PlantUML diagram when plantuml file is saved",
 })
 
 vim.api.nvim_create_user_command("PlantumlUpdate", function()
