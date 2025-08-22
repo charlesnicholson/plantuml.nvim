@@ -342,8 +342,7 @@ function M.open_browser()
     vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
   end
   
-  local url = "http://" .. config.host .. ":" .. config.http_port
-  vim.ui.open(url)
+  vim.ui.open("http://" .. config.host .. ":" .. config.http_port)
 end
 
 return M
