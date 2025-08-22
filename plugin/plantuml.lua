@@ -8,7 +8,6 @@ plantuml.start()
 
 local augroup = vim.api.nvim_create_augroup("PlantUMLViewer", { clear = true })
 
--- Update diagram for all critical events on plantuml files (supports any file extension with filetype=plantuml)
 vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnter" }, {
   group = augroup,
   callback = function()
