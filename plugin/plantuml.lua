@@ -7,7 +7,7 @@ end
 plantuml.start()
 
 local augroup = vim.api.nvim_create_augroup("PlantUMLViewer", { clear = true })
-vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnter" }, {
+vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnter", "FileType" }, {
   group = augroup,
   pattern = "*",
   callback = function()
@@ -15,15 +15,7 @@ vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnt
       plantuml.update_diagram()
     end
   end,
-  desc = "Update PlantUML diagram via WebSocket",
-})
-
--- Also add FileType event for when filetype is set
-vim.api.nvim_create_autocmd("FileType", {
-  group = augroup,
-  pattern = "plantuml",
-  callback = plantuml.update_diagram,
-  desc = "Update PlantUML diagram when plantuml filetype is set",
+  desc = "Update PlantUML diagram via WebSocket when plantuml filetype",
 })
 
 vim.api.nvim_create_user_command("PlantumlUpdate", function()
