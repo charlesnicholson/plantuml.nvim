@@ -2,6 +2,7 @@ local default_config = {
   auto_start = true,
   http_port = 8764,
   plantuml_server_url = "http://www.plantuml.com/plantuml",
+  auto_launch_browser = "never",
 }
 
 local config = vim.deepcopy(default_config)
@@ -234,6 +235,7 @@ local html_content = [[
 local server = {}
 local connected_clients = {}
 local started = false
+local browser_launched_this_session = false
 
 local function encode_ws_frame(payload)
   local len = #payload
@@ -259,6 +261,17 @@ function server.broadcast(tbl)
       connected_clients[client] = nil
     end
   end
+end
+
+local function has_connected_clients()
+  for client, _ in pairs(connected_clients) do
+    if client and not client:is_closing() then
+      return true
+    else
+      connected_clients[client] = nil
+    end
+  end
+  return false
 end
 
 function server.start()
@@ -329,6 +342,15 @@ function M.update_diagram()
   end
 
   server.broadcast({ type = "update", url = plantuml_url, filename = filename })
+
+  if not has_connected_clients() and started then
+    if config.auto_launch_browser == "always" then
+      M.open_browser()
+    elseif config.auto_launch_browser == "once" and not browser_launched_this_session then
+      M.open_browser()
+      browser_launched_this_session = true
+    end
+  end
 end
 
 function M.start()
@@ -342,9 +364,11 @@ end
 function M.open_browser()
   if not started then
     vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
+    return
   end
   
-  vim.ui.open("http://127.0.0.1:" .. config.http_port)
+  local url = "http://127.0.0.1:" .. config.http_port
+  vim.ui.open(url)
 end
 
 function M.stop()
