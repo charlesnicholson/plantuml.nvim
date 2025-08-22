@@ -28,28 +28,25 @@ jobs:
           
     - name: Install Neovim
       run: |
-        # Get the latest release URL from GitHub API
-        LATEST_URL=$(curl -s https://api.github.com/repos/neovim/neovim/releases/latest | grep -o 'https://github.com/neovim/neovim/releases/download/[^"]*nvim-linux64.tar.gz')
-        echo "Downloading Neovim from: $LATEST_URL"
+        # Use Neovim AppImage for reliable installation
+        NEOVIM_VERSION="v0.10.2"
+        DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/${NEOVIM_VERSION}/nvim.appimage"
+        echo "Downloading Neovim ${NEOVIM_VERSION} AppImage from: $DOWNLOAD_URL"
         
-        # Download and verify the file
-        curl -L "$LATEST_URL" -o nvim-linux64.tar.gz
-        if [ ! -f nvim-linux64.tar.gz ] || [ $(stat -c%s nvim-linux64.tar.gz) -lt 1000000 ]; then
+        # Download the AppImage
+        curl -L "$DOWNLOAD_URL" -o nvim.appimage
+        if [ ! -f nvim.appimage ] || [ $(stat -c%s nvim.appimage) -lt 1000000 ]; then
           echo "Download failed or file too small"
+          ls -la nvim.appimage || echo "File does not exist"
           exit 1
         fi
         
-        # Verify it's a valid gzip file
-        if ! gzip -t nvim-linux64.tar.gz; then
-          echo "Downloaded file is not a valid gzip archive"
-          exit 1
-        fi
+        # Make it executable and install
+        chmod +x nvim.appimage
+        sudo mv nvim.appimage /usr/local/bin/nvim
         
-        # Extract and install
-        sudo tar -C /opt -xzf nvim-linux64.tar.gz
-        sudo ln -sf /opt/nvim-linux64/bin/nvim /usr/local/bin/nvim
-        # Add to PATH for current job
-        echo "/opt/nvim-linux64/bin" >> $GITHUB_PATH
+        # Verify installation works
+        /usr/local/bin/nvim --version || exit 1
         
     - name: Verify Neovim installation
       run: |
