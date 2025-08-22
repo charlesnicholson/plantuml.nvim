@@ -28,8 +28,24 @@ jobs:
           
     - name: Install Neovim
       run: |
-        # Download and install latest stable Neovim
-        curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz
+        # Get the latest release URL from GitHub API
+        LATEST_URL=$(curl -s https://api.github.com/repos/neovim/neovim/releases/latest | grep -o 'https://github.com/neovim/neovim/releases/download/[^"]*nvim-linux64.tar.gz')
+        echo "Downloading Neovim from: $LATEST_URL"
+        
+        # Download and verify the file
+        curl -L "$LATEST_URL" -o nvim-linux64.tar.gz
+        if [ ! -f nvim-linux64.tar.gz ] || [ $(stat -c%s nvim-linux64.tar.gz) -lt 1000000 ]; then
+          echo "Download failed or file too small"
+          exit 1
+        fi
+        
+        # Verify it's a valid gzip file
+        if ! gzip -t nvim-linux64.tar.gz; then
+          echo "Downloaded file is not a valid gzip archive"
+          exit 1
+        fi
+        
+        # Extract and install
         sudo tar -C /opt -xzf nvim-linux64.tar.gz
         sudo ln -sf /opt/nvim-linux64/bin/nvim /usr/local/bin/nvim
         # Add to PATH for current job
