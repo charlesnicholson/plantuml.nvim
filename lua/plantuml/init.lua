@@ -314,7 +314,6 @@ function M.update_diagram()
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local buffer_content = table.concat(lines, '\n')
   if buffer_content:match("^%s*$") then
-    vim.schedule(function() vim.print("PlantUML: buffer empty, skipping.") end)
     return
   end
   -- Fetches the full path of the file (:p) instead of just the tail (:t)
@@ -330,7 +329,6 @@ function M.update_diagram()
   end
 
   server.broadcast({ type = "update", url = plantuml_url, filename = filename })
-  vim.schedule(function() vim.print("PlantUML updated: " .. filename) end)
 end
 
 function M.start()
