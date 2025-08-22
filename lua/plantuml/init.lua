@@ -2,7 +2,7 @@ local default_config = {
   auto_start = true,
   http_port = 8764,
   plantuml_server_url = "http://www.plantuml.com/plantuml",
-  auto_launch_browser = "once",
+  auto_launch_browser = "never",
 }
 
 local config = vim.deepcopy(default_config)
@@ -368,24 +368,7 @@ function M.open_browser()
   end
   
   local url = "http://127.0.0.1:" .. config.http_port
-  
-  if vim.ui and vim.ui.open then
-    vim.ui.open(url)
-  else
-    local cmd
-    if vim.fn.has("mac") == 1 then
-      cmd = "open"
-    elseif vim.fn.has("unix") == 1 then
-      cmd = "xdg-open"
-    elseif vim.fn.has("win32") == 1 then
-      cmd = "start"
-    else
-      vim.notify("[plantuml.nvim] Cannot open browser automatically. Please visit: " .. url, vim.log.levels.INFO)
-      return
-    end
-    
-    vim.fn.system(cmd .. " " .. vim.fn.shellescape(url))
-  end
+  vim.ui.open(url)
 end
 
 function M.stop()
