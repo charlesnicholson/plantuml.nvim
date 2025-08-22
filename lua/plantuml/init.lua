@@ -1,8 +1,12 @@
-local config = {
+local default_config = {
+  auto_start = true,
   http_port = 8764,
   websocket_port = 8765,
   host = "127.0.0.1",
+  plantuml_server_url = "http://www.plantuml.com/plantuml/png",
 }
+
+local config = vim.deepcopy(default_config)
 
 assert(pcall(require, "bit"), "[plantuml.nvim] Requires LuaJIT 'bit' library.")
 local bit = require "bit"
@@ -320,7 +324,7 @@ function M.update_diagram()
 
   local compressed_data = zlib.deflate(buffer_content)
   local encoded_data = encode64_plantuml(compressed_data)
-  local plantuml_url = "http://www.plantuml.com/plantuml/png/~1" .. encoded_data
+  local plantuml_url = config.plantuml_server_url .. "/~1" .. encoded_data
 
   if #plantuml_url > 8000 then
     vim.notify("PlantUML: Resulting URL is very long and may be rejected by the server.", vim.log.levels.WARN)
@@ -343,6 +347,25 @@ function M.open_browser()
   end
   
   vim.ui.open("http://" .. config.host .. ":" .. config.http_port)
+end
+
+function M.stop()
+  if not started then
+    vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
+    return
+  end
+  started = false
+  vim.notify("[plantuml.nvim] Server stopped.", vim.log.levels.INFO)
+end
+
+function M.setup(user_config)
+  if user_config then
+    config = vim.tbl_deep_extend("force", default_config, user_config)
+  end
+end
+
+function M.get_config()
+  return vim.deepcopy(config)
 end
 
 return M
