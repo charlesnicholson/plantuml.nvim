@@ -141,9 +141,11 @@ local html_content = [[
   .file{margin-left:.25rem;color:var(--fg);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .spacer{flex:1}
   .wrap{flex:1;min-height:0;padding:0.75rem}
-  .board{position:relative;width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center;border-radius:8px;background:#0c0d10;outline:1px solid #111318;overflow-y:auto;overflow-x:hidden;cursor:pointer}
-  #img{display:block;opacity:0;transition:opacity .2s ease-in-out;width:100%;height:auto;max-width:none;max-height:none}
-  #ph{color:var(--muted);font-size:.9rem;margin-top:2rem}
+  .board{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#0c0d10;outline:1px solid #111318;overflow-y:auto;overflow-x:hidden;cursor:pointer}
+  .board.has-diagram{align-items:flex-start}
+  #img{display:none;opacity:0;transition:opacity .2s ease-in-out;height:auto;max-width:none;max-height:none}
+  .board.has-diagram #img{display:block;width:100%}
+  #ph{color:var(--muted);font-size:.9rem;text-align:center;}
   .board.fit-to-page{align-items:center;overflow:hidden}
   .board.fit-to-page #img{width:auto;height:auto;max-width:100%;max-height:100%}
 </style>
@@ -157,7 +159,7 @@ local html_content = [[
   <div class="wrap">
     <div class="board" id="board">
       <img id="img" alt="PlantUML diagram">
-      <p id="ph">Waiting for a diagram… save a <code>.puml</code> file in Neovim.</p>
+      <p id="ph">Ready for a diagram.<br>Save a PlantUML file in Neovim to view it here.</p>
     </div>
   </div>
 <script>
@@ -165,6 +167,7 @@ local html_content = [[
   const fileEl=document.getElementById("file"), ph=document.getElementById("ph");
   const img=document.getElementById("img"), board=document.getElementById("board");
   let isFitToPage = false;
+  let hasLoadedDiagram = false;
 
   function setStatus(kind,text){
     statusEl.className = 'pill';
@@ -194,6 +197,10 @@ local html_content = [[
       try{
         const data=JSON.parse(e.data);
         if(data.type==="update"&&data.url){
+          if (!hasLoadedDiagram) {
+            board.classList.add('has-diagram');
+            hasLoadedDiagram = true;
+          }
           setStatus("warn", "Reloading...");
           img.style.opacity = 0;
           if(data.filename){fileEl.textContent=data.filename; fileEl.title=data.filename;}
@@ -306,7 +313,8 @@ function M.update_diagram()
     vim.schedule(function() vim.print("PlantUML: buffer empty, skipping.") end)
     return
   end
-  local filename = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":t")
+  -- Fetches the full path of the file (:p) instead of just the tail (:t)
+  local filename = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":p")
   if filename == "" then filename = "untitled.puml" end
 
   local compressed_data = zlib.deflate(buffer_content)
