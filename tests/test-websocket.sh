@@ -8,9 +8,25 @@ echo "Testing WebSocket server..." | tee "$LOG_FILE"
 echo "Starting Neovim with plugin..." | tee -a "$LOG_FILE"
 nvim --headless -u ~/.config/nvim/init.lua -c "lua require('plantuml').start()" &
 NVIM_PID=$!
+echo "Neovim started with PID: $NVIM_PID" | tee -a "$LOG_FILE"
 
 # Give server time to start
-sleep 3
+sleep 5
+
+# Verify both servers are running before proceeding
+echo "Verifying servers are ready..." | tee -a "$LOG_FILE"
+for i in {1..10}; do
+    if netstat -ln | grep ":8764" && netstat -ln | grep ":8765"; then
+        echo "Both servers are listening" | tee -a "$LOG_FILE"
+        break
+    fi
+    if [ $i -eq 10 ]; then
+        echo "Servers not ready after 10 seconds" | tee -a "$LOG_FILE"
+        netstat -ln | grep ":876" | tee -a "$LOG_FILE" || true
+        exit 1
+    fi
+    sleep 1
+done
 
 # Cleanup function
 cleanup() {
@@ -110,15 +126,19 @@ fi
 
 # Test 3: WebSocket accepts proper upgrade headers
 echo "Test 3: WebSocket upgrade headers" | tee -a "$LOG_FILE"
-UPGRADE_RESPONSE=$(curl -i -s \
+UPGRADE_RESPONSE=$(timeout 10 curl -i -s \
     -H "Upgrade: websocket" \
     -H "Connection: Upgrade" \
     -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
     -H "Sec-WebSocket-Version: 13" \
-    "http://127.0.0.1:8765" || true)
+    "http://127.0.0.1:8765" 2>&1 || echo "TIMEOUT_OR_ERROR")
 
 if echo "$UPGRADE_RESPONSE" | grep -q "101 Switching Protocols"; then
     echo "✓ WebSocket upgrade response correct" | tee -a "$LOG_FILE"
+elif echo "$UPGRADE_RESPONSE" | grep -q "TIMEOUT_OR_ERROR"; then
+    echo "✗ WebSocket upgrade request timed out or failed" | tee -a "$LOG_FILE"
+    echo "This may indicate the WebSocket server is not responding properly" | tee -a "$LOG_FILE"
+    exit 1
 else
     echo "✗ WebSocket upgrade response incorrect" | tee -a "$LOG_FILE"
     echo "Response: $UPGRADE_RESPONSE" | tee -a "$LOG_FILE"
@@ -127,10 +147,15 @@ fi
 
 # Test 4: WebSocket includes proper Sec-WebSocket-Accept header
 echo "Test 4: Sec-WebSocket-Accept header" | tee -a "$LOG_FILE"
-if echo "$UPGRADE_RESPONSE" | grep -q "Sec-WebSocket-Accept:"; then
+if echo "$UPGRADE_RESPONSE" | grep -q "TIMEOUT_OR_ERROR"; then
+    echo "✗ Cannot test Sec-WebSocket-Accept header - previous test timed out" | tee -a "$LOG_FILE"
+    exit 1
+elif echo "$UPGRADE_RESPONSE" | grep -q "Sec-WebSocket-Accept:"; then
     echo "✓ Sec-WebSocket-Accept header present" | tee -a "$LOG_FILE"
 else
     echo "✗ Sec-WebSocket-Accept header missing" | tee -a "$LOG_FILE"
+    echo "Full response headers:" | tee -a "$LOG_FILE"
+    echo "$UPGRADE_RESPONSE" | head -10 | tee -a "$LOG_FILE"
     exit 1
 fi
 
