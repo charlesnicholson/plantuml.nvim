@@ -8,15 +8,7 @@ plantuml.start()
 
 local augroup = vim.api.nvim_create_augroup("PlantUMLViewer", { clear = true })
 
--- Trigger on plantuml filetype (supports any file extension that sets filetype=plantuml)
-vim.api.nvim_create_autocmd("FileType", {
-  group = augroup,
-  pattern = "plantuml",
-  callback = plantuml.update_diagram,
-  desc = "Update PlantUML diagram when filetype is set to plantuml",
-})
-
--- Update diagram for all the original critical events on plantuml files
+-- Update diagram for all critical events on plantuml files (supports any file extension with filetype=plantuml)
 vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnter" }, {
   group = augroup,
   callback = function()
