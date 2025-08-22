@@ -339,8 +339,7 @@ end
 
 function M.open_browser()
   if not started then
-    vim.notify("[plantuml.nvim] Server is not running. Start Neovim with a .puml file to start the server.", vim.log.levels.WARN)
-    return
+    vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
   end
   
   local url = "http://" .. config.host .. ":" .. config.http_port
