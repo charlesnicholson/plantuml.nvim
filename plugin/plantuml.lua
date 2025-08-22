@@ -22,6 +22,6 @@ vim.api.nvim_create_user_command("PlantumlUpdate", function()
   plantuml.update_diagram()
 end, { desc = "Manually trigger PlantUML update" })
 
-vim.api.nvim_create_user_command("PlantumlOpen", function()
+vim.api.nvim_create_user_command("PlantumlLaunchBrowser", function()
   plantuml.open_browser()
-end, { desc = "Open PlantUML web viewer in browser" })
+end, { desc = "Launch browser to view PlantUML diagrams" })

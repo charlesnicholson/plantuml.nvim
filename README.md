@@ -15,7 +15,7 @@ It starts automatically and runs a server on http://127.0.0.1:8764/. Browse to t
 ## Commands
 
 - `:PlantumlUpdate` - Manually trigger a PlantUML diagram update
-- `:PlantumlOpen` - Open the PlantUML web viewer in your default browser
+- `:PlantumlLaunchBrowser` - Launch browser to view PlantUML diagrams
 
 This was 100% vibe coded but the code doesn't look awful, so whatever. Lots of stuff to improve but the core of it is up and running.
 
