@@ -362,6 +362,10 @@ function M.setup(user_config)
   if user_config then
     config = vim.tbl_deep_extend("force", default_config, user_config)
   end
+  
+  if config.http_port == config.websocket_port then
+    vim.notify("[plantuml.nvim] Warning: HTTP and WebSocket ports are the same. This may cause conflicts.", vim.log.levels.WARN)
+  end
 end
 
 function M.get_config()
