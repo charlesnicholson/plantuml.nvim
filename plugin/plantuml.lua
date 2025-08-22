@@ -16,14 +16,6 @@ vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnt
   desc = "Update PlantUML diagram via WebSocket",
 })
 
--- Filetype-based detection for manual filetype setting
-vim.api.nvim_create_autocmd("FileType", {
-  group = augroup,
-  pattern = "plantuml",
-  callback = plantuml.update_diagram,
-  desc = "Update PlantUML diagram when plantuml filetype is set",
-})
-
 vim.api.nvim_create_user_command("PlantumlUpdate", function()
   plantuml.update_diagram()
 end, { desc = "Manually trigger PlantUML update" })
