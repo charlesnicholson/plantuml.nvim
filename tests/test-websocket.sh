@@ -124,38 +124,95 @@ else
     exit 1
 fi
 
-# Test 3: WebSocket accepts proper upgrade headers
-echo "Test 3: WebSocket upgrade headers" | tee -a "$LOG_FILE"
-UPGRADE_RESPONSE=$(timeout 10 curl -i -s \
-    -H "Upgrade: websocket" \
-    -H "Connection: Upgrade" \
-    -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-    -H "Sec-WebSocket-Version: 13" \
-    "http://127.0.0.1:8765" 2>&1 || echo "TIMEOUT_OR_ERROR")
+# Test 3: WebSocket upgrade handshake validation with Node.js
+echo "Test 3: WebSocket upgrade handshake validation" | tee -a "$LOG_FILE"
 
-if echo "$UPGRADE_RESPONSE" | grep -q "101 Switching Protocols"; then
-    echo "✓ WebSocket upgrade response correct" | tee -a "$LOG_FILE"
-elif echo "$UPGRADE_RESPONSE" | grep -q "TIMEOUT_OR_ERROR"; then
-    echo "✗ WebSocket upgrade request timed out or failed" | tee -a "$LOG_FILE"
-    echo "This may indicate the WebSocket server is not responding properly" | tee -a "$LOG_FILE"
-    exit 1
-else
-    echo "✗ WebSocket upgrade response incorrect" | tee -a "$LOG_FILE"
-    echo "Response: $UPGRADE_RESPONSE" | tee -a "$LOG_FILE"
-    exit 1
-fi
+# Create a more robust WebSocket upgrade test using Node.js
+cat > /tmp/websocket_upgrade_test.js << EOF
+const net = require('net');
+const crypto = require('crypto');
 
-# Test 4: WebSocket includes proper Sec-WebSocket-Accept header
-echo "Test 4: Sec-WebSocket-Accept header" | tee -a "$LOG_FILE"
-if echo "$UPGRADE_RESPONSE" | grep -q "TIMEOUT_OR_ERROR"; then
-    echo "✗ Cannot test Sec-WebSocket-Accept header - previous test timed out" | tee -a "$LOG_FILE"
-    exit 1
-elif echo "$UPGRADE_RESPONSE" | grep -q "Sec-WebSocket-Accept:"; then
-    echo "✓ Sec-WebSocket-Accept header present" | tee -a "$LOG_FILE"
+function testWebSocketUpgrade() {
+    return new Promise((resolve, reject) => {
+        const socket = new net.Socket();
+        let responseData = '';
+        
+        socket.setTimeout(5000); // 5 second timeout
+        
+        socket.on('data', (data) => {
+            responseData += data.toString();
+            // Check if we have the complete HTTP response
+            if (responseData.includes('\r\n\r\n')) {
+                socket.end();
+                resolve(responseData);
+            }
+        });
+        
+        socket.on('timeout', () => {
+            socket.destroy();
+            reject(new Error('Connection timeout'));
+        });
+        
+        socket.on('error', (err) => {
+            reject(err);
+        });
+        
+        socket.on('close', () => {
+            if (!responseData.includes('\r\n\r\n')) {
+                reject(new Error('Connection closed before complete response'));
+            }
+        });
+        
+        socket.connect(8765, '127.0.0.1', () => {
+            const key = 'dGhlIHNhbXBsZSBub25jZQ==';
+            const request = [
+                'GET / HTTP/1.1',
+                'Host: 127.0.0.1:8765',
+                'Upgrade: websocket',
+                'Connection: Upgrade',
+                'Sec-WebSocket-Key: ' + key,
+                'Sec-WebSocket-Version: 13',
+                '',
+                ''
+            ].join('\r\n');
+            
+            socket.write(request);
+        });
+    });
+}
+
+testWebSocketUpgrade().then(response => {
+    console.log('WebSocket upgrade response received');
+    
+    // Check for 101 Switching Protocols
+    if (response.includes('101 Switching Protocols')) {
+        console.log('✓ Status: 101 Switching Protocols');
+    } else {
+        console.log('✗ Missing 101 Switching Protocols status');
+        console.log('Response:', response.substring(0, 200));
+        process.exit(1);
+    }
+    
+    // Check for Sec-WebSocket-Accept header
+    if (response.includes('Sec-WebSocket-Accept:')) {
+        console.log('✓ Sec-WebSocket-Accept header present');
+    } else {
+        console.log('✗ Sec-WebSocket-Accept header missing');
+        console.log('Response headers:', response.split('\r\n\r\n')[0]);
+        process.exit(1);
+    }
+    
+    process.exit(0);
+}).catch(err => {
+    console.error('WebSocket upgrade test failed:', err.message);
+    process.exit(1);
+});
+EOF
+
+if node /tmp/websocket_upgrade_test.js 2>&1 | tee -a "$LOG_FILE"; then
+    echo "✓ WebSocket upgrade handshake validation successful" | tee -a "$LOG_FILE"
 else
-    echo "✗ Sec-WebSocket-Accept header missing" | tee -a "$LOG_FILE"
-    echo "Full response headers:" | tee -a "$LOG_FILE"
-    echo "$UPGRADE_RESPONSE" | head -10 | tee -a "$LOG_FILE"
+    echo "✗ WebSocket upgrade handshake validation failed" | tee -a "$LOG_FILE"
     exit 1
 fi
 
