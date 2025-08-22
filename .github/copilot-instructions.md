@@ -4,6 +4,8 @@
 
 This is a pure Lua Neovim plugin that provides automatic PlantUML diagram rendering in a local web browser. The plugin runs HTTP and WebSocket servers to deliver real-time diagram updates when `.puml` files are saved in Neovim.
 
+**Requirements**: Neovim 0.11+ (uses modern APIs and features)
+
 ## Architecture & Design Principles
 
 ### Core Components
@@ -17,6 +19,8 @@ This is a pure Lua Neovim plugin that provides automatic PlantUML diagram render
 - **Self-contained**: All web assets (HTML/CSS/JS) remain embedded in the main Lua file
 - **Vendor preservation**: Third-party code in `vendor/` directories must not be modified
 - **Single-file approach**: Keep the web interface embedded rather than split into separate files
+- **Comment-free**: Code should be self-documenting without comments
+- **Modern Neovim**: Targets Neovim 0.11+ with modern APIs
 
 ## Development Guidelines
 
@@ -57,6 +61,11 @@ plugin/
 
 ### Constraints & Requirements
 
+#### No Testing Infrastructure
+- **Do not write tests** - this project has no test infrastructure by design
+- **Do not attempt to run tests** - there are none and none should be added
+- All validation is done through manual testing only
+
 #### NEVER Modify
 - Files in `lua/plantuml/vendor/` - these are pristine third-party libraries
 - Vendor LICENSE files or documentation
@@ -65,6 +74,7 @@ plugin/
 - HTML, CSS, and JavaScript must remain in `lua/plantuml/init.lua`
 - Do not split web assets into separate files
 - Maintain the single-file simplicity approach
+- **Never add comments** to embedded HTML, CSS, or JavaScript
 
 #### WebSocket Protocol
 - Implement proper WebSocket handshaking with Sec-WebSocket-Accept headers
@@ -73,7 +83,9 @@ plugin/
 
 ### Testing & Validation
 
-#### Manual Testing
+**Important**: This project has no test infrastructure and no tests should be written. Testing is done manually only.
+
+#### Manual Testing Only
 - Start Neovim and verify the plugin loads without errors
 - Check that HTTP server starts on `127.0.0.1:8764`
 - Open browser to verify web interface loads
@@ -88,7 +100,7 @@ plugin/
 - PlantUML URL length limits (warn at >8000 characters)
 - Network connectivity to plantuml.com service
 
-#### File Patterns to Test
+#### File Patterns to Validate
 - `*.puml` files trigger autocmds
 - Empty/whitespace-only buffers are skipped
 - Untitled buffers default to "untitled.puml"
@@ -101,6 +113,7 @@ plugin/
 - Local variables for module imports
 - Consistent error messages with "[plantuml.nvim]" prefix
 - Use `local M = {}` pattern for module exports
+- **Never add comments** - keep code clean and uncommented
 
 #### API Patterns
 - Buffer operations default to current buffer (buf = 0)
@@ -176,11 +189,13 @@ vim.api.nvim_create_autocmd({ "Event1", "Event2" }, {
 ## When Making Changes
 
 1. **Preserve the embedded approach**: Keep HTML/CSS/JS in `lua/plantuml/init.lua`
-2. **Test server functionality**: Verify both HTTP and WebSocket servers work
-3. **Validate PlantUML integration**: Ensure diagram updates propagate correctly
-4. **Check browser compatibility**: Test the embedded web interface
-5. **Respect vendor boundaries**: Never modify files in `vendor/` directories
-6. **Maintain simplicity**: This plugin values simplicity over feature complexity
+2. **No comments**: Never add comments to Lua code or embedded web assets
+3. **Manual testing only**: Verify both HTTP and WebSocket servers work through browser testing
+4. **Validate PlantUML integration**: Ensure diagram updates propagate correctly
+5. **Check browser compatibility**: Test the embedded web interface
+6. **Respect vendor boundaries**: Never modify files in `vendor/` directories
+7. **Maintain simplicity**: This plugin values simplicity over feature complexity
+8. **Neovim 0.11+ only**: Use modern APIs without fallback paths
 
 ## References
 
