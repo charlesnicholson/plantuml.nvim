@@ -48,6 +48,13 @@ plugin/
 - Client management uses connection tracking table
 - Graceful cleanup of closed connections
 
+#### Web UI Patterns
+- Status indicators use CSS classes: `.pill.ok`, `.pill.err`, `.pill.warn`
+- Diagram viewing modes: `fit-to-page` (default) and full-size (click to toggle)
+- CSS custom properties (variables) for theming: `--bg`, `--fg`, `--muted`, etc.
+- Responsive design with flexbox layout
+- WebSocket reconnection with exponential backoff (1.5s delay)
+
 ### Constraints & Requirements
 
 #### NEVER Modify
@@ -72,12 +79,20 @@ plugin/
 - Open browser to verify web interface loads
 - Create/edit `.puml` files and verify real-time updates work
 - Test WebSocket connectivity and message broadcast
+- Verify diagram click toggles between fit-to-page and full-size modes
 
 #### Common Issues
-- LuaJIT `bit` library availability
-- Port conflicts (8764/8765)
-- WebSocket handshake failures
+- LuaJIT `bit` library availability (required dependency)
+- Port conflicts (8764/8765) - check for other services
+- WebSocket handshake failures - verify Sec-WebSocket-Key handling
 - PlantUML URL length limits (warn at >8000 characters)
+- Network connectivity to plantuml.com service
+
+#### File Patterns to Test
+- `*.puml` files trigger autocmds
+- Empty/whitespace-only buffers are skipped
+- Untitled buffers default to "untitled.puml"
+- File path handling with special characters
 
 ### Coding Style
 
@@ -97,8 +112,16 @@ plugin/
 
 - Compression using LibDeflate for PlantUML encoding
 - Connection pooling for WebSocket clients
-- Efficient buffer content reading
+- Efficient buffer content reading with `vim.api.nvim_buf_get_lines()`
 - Minimal DOM manipulation in embedded JavaScript
+- PlantUML URL construction: `http://www.plantuml.com/plantuml/png/~1{encoded_data}`
+
+#### PlantUML Encoding Process
+1. Extract buffer content as string
+2. Compress using LibDeflate (zlib compression)
+3. Encode with custom Base64-like encoding (`encode64_plantuml`)
+4. Construct URL with encoded data
+5. Broadcast via WebSocket to connected clients
 
 ### Security Notes
 
@@ -129,6 +152,17 @@ server.broadcast({
 })
 ```
 
+#### Adding User Commands
+```lua
+vim.api.nvim_create_user_command("CommandName", function(opts)
+  -- command implementation
+  plantuml.update_diagram()
+end, { 
+  desc = "Command description",
+  nargs = 0,  -- or 1, '?', '*', etc.
+})
+```
+
 #### Adding Autocmd Triggers
 ```lua
 vim.api.nvim_create_autocmd({ "Event1", "Event2" }, {
@@ -154,3 +188,4 @@ vim.api.nvim_create_autocmd({ "Event1", "Event2" }, {
 - [RFC 6455 - WebSocket Protocol](https://tools.ietf.org/html/rfc6455)
 - [Neovim Lua API Reference](https://neovim.io/doc/user/lua.html)
 - [LuaJIT BitOp Library](http://bitop.luajit.org/)
+- [GitHub Copilot Best Practices](https://gh.io/copilot-coding-agent-tips)
