@@ -17,7 +17,6 @@ A pure Lua Neovim plugin for automatically rendering PlantUML diagrams in a loca
   opts = {
     auto_start = true,
     http_port = 8764,
-    host = "127.0.0.1",
     plantuml_server_url = "http://www.plantuml.com/plantuml",
   }
 }
@@ -38,7 +37,6 @@ The plugin supports the following configuration options:
 
 - `auto_start` (boolean, default: `true`) - Whether to automatically start the server when the plugin loads
 - `http_port` (number, default: `8764`) - Port for the HTTP server (WebSocket server uses http_port + 1)
-- `host` (string, default: `"127.0.0.1"`) - Host address to bind the servers to
 - `plantuml_server_url` (string, default: `"http://www.plantuml.com/plantuml"`) - Base URL for the PlantUML server (the `/png/~1` component is automatically appended)
 
 By default, the plugin starts automatically and runs a server on http://127.0.0.1:8764/. Browse to that page, and it will refresh automatically any time you save, open, or enter a buffer with a filename ending in `.puml`.

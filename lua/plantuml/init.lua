@@ -1,7 +1,6 @@
 local default_config = {
   auto_start = true,
   http_port = 8764,
-  host = "127.0.0.1",
   plantuml_server_url = "http://www.plantuml.com/plantuml",
 }
 
@@ -267,7 +266,7 @@ function server.start()
   started = true
 
   local http_server = vim.loop.new_tcp()
-  http_server:bind(config.host, config.http_port)
+  http_server:bind("127.0.0.1", config.http_port)
   http_server:listen(128, function(err)
     assert(not err, err)
     local client = vim.loop.new_tcp()
@@ -282,7 +281,7 @@ function server.start()
   end)
 
   local ws_server = vim.loop.new_tcp()
-  ws_server:bind(config.host, config.http_port + 1)
+  ws_server:bind("127.0.0.1", config.http_port + 1)
   ws_server:listen(128, function(err)
     assert(not err, err)
     local client = vim.loop.new_tcp()
@@ -345,7 +344,7 @@ function M.open_browser()
     vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
   end
   
-  vim.ui.open("http://" .. config.host .. ":" .. config.http_port)
+  vim.ui.open("http://127.0.0.1:" .. config.http_port)
 end
 
 function M.stop()
