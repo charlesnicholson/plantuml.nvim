@@ -193,7 +193,10 @@ local html_content = [[
     const wsUrl = "ws://" + host + ":" + wsPort();
     const ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => setStatus("ok","Live");
+    ws.onopen = () => {
+      setStatus("ok","Live");
+      ws.send(JSON.stringify({type: "refresh"}));
+    };
 
     ws.onmessage = e => {
       try{
@@ -236,6 +239,7 @@ local server = {}
 local connected_clients = {}
 local started = false
 local browser_launched_this_session = false
+local last_message = nil
 
 local function encode_ws_frame(payload)
   local len = #payload
@@ -252,7 +256,45 @@ local function encode_ws_frame(payload)
   end
 end
 
+local function decode_ws_frame(data)
+  if #data < 2 then return nil end
+  local byte1, byte2 = data:byte(1, 2)
+  local fin = bit.band(byte1, 0x80) ~= 0
+  local opcode = bit.band(byte1, 0x0F)
+  local masked = bit.band(byte2, 0x80) ~= 0
+  local payload_len = bit.band(byte2, 0x7F)
+  
+  if not fin or opcode ~= 1 then return nil end
+  
+  local offset = 2
+  if payload_len == 126 then
+    if #data < 4 then return nil end
+    payload_len = bit.bor(bit.lshift(data:byte(3), 8), data:byte(4))
+    offset = 4
+  elseif payload_len == 127 then
+    if #data < 10 then return nil end
+    offset = 10
+  end
+  
+  if masked then
+    if #data < offset + 4 then return nil end
+    local mask = data:sub(offset + 1, offset + 4)
+    offset = offset + 4
+    if #data < offset + payload_len then return nil end
+    local payload = data:sub(offset + 1, offset + payload_len)
+    local decoded = {}
+    for i = 1, #payload do
+      decoded[i] = string.char(bit.bxor(payload:byte(i), mask:byte((i - 1) % 4 + 1)))
+    end
+    return table.concat(decoded)
+  else
+    if #data < offset + payload_len then return nil end
+    return data:sub(offset + 1, offset + payload_len)
+  end
+end
+
 function server.broadcast(tbl)
+  last_message = tbl
   local frame = encode_ws_frame(vim.json.encode(tbl))
   for client, _ in pairs(connected_clients) do
     if client and not client:is_closing() then
@@ -299,22 +341,35 @@ function server.start()
     assert(not err, err)
     local client = vim.loop.new_tcp()
     ws_server:accept(client)
+    local handshake_done = false
     client:read_start(function(err2, data)
       if err2 or not data then
         connected_clients[client] = nil; client:close(); return
       end
       vim.schedule(function()
-        local key = data:match("Sec%-WebSocket%-Key: ([%w%+/=]+)")
-        if key then
-          local guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-          local accept_key_b64 = b64(sha1(key .. guid))
-          local response =
-              "HTTP/1.1 101 Switching Protocols\r\n" ..
-              "Upgrade: websocket\r\n" ..
-              "Connection: Upgrade\r\n" ..
-              "Sec-WebSocket-Accept: " .. accept_key_b64 .. "\r\n\r\n"
-          client:write(response)
-          connected_clients[client] = true
+        if not handshake_done then
+          local key = data:match("Sec%-WebSocket%-Key: ([%w%+/=]+)")
+          if key then
+            local guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+            local accept_key_b64 = b64(sha1(key .. guid))
+            local response =
+                "HTTP/1.1 101 Switching Protocols\r\n" ..
+                "Upgrade: websocket\r\n" ..
+                "Connection: Upgrade\r\n" ..
+                "Sec-WebSocket-Accept: " .. accept_key_b64 .. "\r\n\r\n"
+            client:write(response)
+            connected_clients[client] = true
+            handshake_done = true
+          end
+        else
+          local payload = decode_ws_frame(data)
+          if payload then
+            local ok, message = pcall(vim.json.decode, payload)
+            if ok and message and message.type == "refresh" and last_message then
+              local frame = encode_ws_frame(vim.json.encode(last_message))
+              client:write(frame)
+            end
+          end
         end
       end)
     end)
