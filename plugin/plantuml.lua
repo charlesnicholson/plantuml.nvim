@@ -16,15 +16,15 @@ vim.api.nvim_create_autocmd("FileType", {
   desc = "Update PlantUML diagram when filetype is set to plantuml",
 })
 
--- Update diagram when plantuml files are saved
-vim.api.nvim_create_autocmd("BufWritePost", {
+-- Update diagram for all the original critical events on plantuml files
+vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnter" }, {
   group = augroup,
   callback = function()
     if vim.bo.filetype == "plantuml" then
       plantuml.update_diagram()
     end
   end,
-  desc = "Update PlantUML diagram when plantuml file is saved",
+  desc = "Update PlantUML diagram on file events for plantuml files",
 })
 
 vim.api.nvim_create_user_command("PlantumlUpdate", function()
