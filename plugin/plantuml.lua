@@ -11,7 +11,7 @@ local augroup = vim.api.nvim_create_augroup("PlantUMLViewer", { clear = true })
 -- Pattern-based detection for efficiency
 vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnter" }, {
   group = augroup,
-  pattern = { "*.puml", "*.plantuml", "*.pu", "*.uml" },
+  pattern = { "*.puml", "*.plantuml" },
   callback = plantuml.update_diagram,
   desc = "Update PlantUML diagram via WebSocket",
 })
