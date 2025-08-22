@@ -119,6 +119,7 @@ do
   end
 end
 
+-- Updated HTML, CSS, and JavaScript content
 local html_content = [[
 <!doctype html>
 <html lang="en">
@@ -131,15 +132,20 @@ local html_content = [[
   *{box-sizing:border-box} html,body{height:100%;overflow:hidden;}
   body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column}
   .top{display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;border-bottom:1px solid #111318;background:var(--panel)}
-  .dot{width:.5rem;height:.5rem;border-radius:999px;display:inline-block;vertical-align:middle;background:var(--warn)}
+  .dot{width:.5rem;height:.5rem;border-radius:999px;display:inline-block;vertical-align:middle}
   .pill{display:inline-flex;align-items:center;gap:.35rem;padding:.15rem .45rem;border-radius:999px;background:var(--pill-bg);color:var(--muted);font-size:.75rem;font-weight:500}
-  .pill.ok .dot{background:var(--ok)} .pill.err .dot{background:var(--err)}
+  .pill .dot{background:var(--warn)}
+  .pill.ok .dot{background:var(--ok)}
+  .pill.err .dot{background:var(--err)}
+  .pill.warn .dot{background:var(--warn)}
   .file{margin-left:.25rem;color:var(--fg);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .spacer{flex:1}
   .wrap{flex:1;min-height:0;padding:0.75rem}
-  .board{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#0c0d10;outline:1px solid #111318;overflow:hidden;}
-  #img{display:block;opacity:0;transition:opacity .2s ease-in-out;max-width:100%;max-height:100%;width:auto;height:auto;}
-  #ph{color:var(--muted);font-size:.9rem}
+  .board{position:relative;width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center;border-radius:8px;background:#0c0d10;outline:1px solid #111318;overflow-y:auto;overflow-x:hidden;cursor:pointer}
+  #img{display:block;opacity:0;transition:opacity .2s ease-in-out;width:100%;height:auto;max-width:none;max-height:none}
+  #ph{color:var(--muted);font-size:.9rem;margin-top:2rem}
+  .board.fit-to-page{align-items:center;overflow:hidden}
+  .board.fit-to-page #img{width:auto;height:auto;max-width:100%;max-height:100%}
 </style>
 </head>
 <body>
@@ -157,30 +163,38 @@ local html_content = [[
 <script>
   const statusEl=document.getElementById("status"), statusText=document.getElementById("status-text");
   const fileEl=document.getElementById("file"), ph=document.getElementById("ph");
-  const img=document.getElementById("img");
+  const img=document.getElementById("img"), board=document.getElementById("board");
+  let isFitToPage = false;
 
   function setStatus(kind,text){
-    statusEl.classList.remove("ok","err");
-    if(kind==="ok")statusEl.classList.add("ok");
-    if(kind==="err")statusEl.classList.add("err");
+    statusEl.className = 'pill';
+    if(kind) statusEl.classList.add(kind);
     statusText.textContent=text;
   }
 
+  board.addEventListener('click', () => {
+    if (!img.src) return;
+    isFitToPage = !isFitToPage;
+    board.classList.toggle('fit-to-page', isFitToPage);
+  });
+
   function wsPort() {
     const p = parseInt(location.port || "0", 10);
-    if (p > 0) return String(p + 1);
-    return "8765";
+    return (p > 0) ? String(p + 1) : "8765";
   }
 
   function connect(){
     const host = location.hostname || "127.0.0.1";
     const wsUrl = "ws://" + host + ":" + wsPort();
     const ws = new WebSocket(wsUrl);
-    ws.onopen = () => setStatus("ok","connected");
+
+    ws.onopen = () => setStatus("ok","Live");
+
     ws.onmessage = e => {
       try{
         const data=JSON.parse(e.data);
         if(data.type==="update"&&data.url){
+          setStatus("warn", "Reloading...");
           img.style.opacity = 0;
           if(data.filename){fileEl.textContent=data.filename; fileEl.title=data.filename;}
           ph.style.display="none";
@@ -188,12 +202,17 @@ local html_content = [[
         }
       }catch(err){console.error(err);}
     };
-    ws.onclose = () => { setStatus("", "reconnecting…"); setTimeout(connect, 1200); };
-    ws.onerror = () => setStatus("err","error");
+
+    ws.onclose = () => { setStatus("err", "Reconnecting..."); setTimeout(connect, 1500); };
+    ws.onerror = () => setStatus("err","Error");
   }
 
-  img.onload = () => { img.style.opacity = 1; };
-  setStatus("", "connecting");
+  img.onload = () => {
+    img.style.opacity = 1;
+    setStatus("ok", "Live");
+  };
+
+  setStatus("warn", "Connecting...");
   connect();
 </script>
 </body>
@@ -243,7 +262,7 @@ function server.start()
     client:read_start(function(_, data)
       if data then
         local response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " ..
-            #html_content .. "\r\n\r\n" .. html_content
+          #html_content .. "\r\n\r\n" .. html_content
         client:write(response, function() client:close() end)
       end
     end)
@@ -311,4 +330,3 @@ function M.is_running()
 end
 
 return M
-
