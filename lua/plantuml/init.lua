@@ -157,7 +157,7 @@ local html_content = [[
     <span class="spacer"></span>
   </div>
   <div class="wrap">
-    <div class="board" id="board">
+    <div class="board fit-to-page" id="board">
       <img id="img" alt="PlantUML diagram">
       <p id="ph">Ready for a diagram.<br>Save a PlantUML file in Neovim to view it here.</p>
     </div>
@@ -166,7 +166,7 @@ local html_content = [[
   const statusEl=document.getElementById("status"), statusText=document.getElementById("status-text");
   const fileEl=document.getElementById("file"), ph=document.getElementById("ph");
   const img=document.getElementById("img"), board=document.getElementById("board");
-  let isFitToPage = false;
+  let isFitToPage = true;
   let hasLoadedDiagram = false;
 
   function setStatus(kind,text){
@@ -176,7 +176,7 @@ local html_content = [[
   }
 
   board.addEventListener('click', () => {
-    if (!img.src) return;
+    if (!hasLoadedDiagram) return;
     isFitToPage = !isFitToPage;
     board.classList.toggle('fit-to-page', isFitToPage);
   });
