@@ -83,16 +83,6 @@ plugin/
 
 ### Testing & Validation
 
-**Important**: This project has no test infrastructure and no tests should be written. Testing is done manually only.
-
-#### Manual Testing Only
-- Start Neovim and verify the plugin loads without errors
-- Check that HTTP server starts on `127.0.0.1:8764`
-- Open browser to verify web interface loads
-- Create/edit `.puml` files and verify real-time updates work
-- Test WebSocket connectivity and message broadcast
-- Verify diagram click toggles between fit-to-page and full-size modes
-
 #### Common Issues
 - LuaJIT `bit` library availability (required dependency)
 - Port conflicts (8764/8765) - check for other services
