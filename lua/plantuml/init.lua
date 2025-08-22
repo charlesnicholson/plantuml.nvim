@@ -339,4 +339,32 @@ function M.is_running()
   return started
 end
 
+function M.open_browser()
+  if not started then
+    vim.notify("[plantuml.nvim] Server is not running. Start Neovim with a .puml file to start the server.", vim.log.levels.WARN)
+    return
+  end
+  
+  local url = "http://" .. config.host .. ":" .. config.http_port
+  
+  -- Use vim.ui.open if available (Neovim 0.10+)
+  if vim.ui and vim.ui.open then
+    vim.ui.open(url)
+  else
+    -- Fallback for older Neovim versions
+    local cmd
+    if vim.fn.has("win32") == 1 then
+      cmd = "start " .. url
+    elseif vim.fn.has("macunix") == 1 then
+      cmd = "open " .. url
+    else
+      -- Linux and other Unix-like systems
+      cmd = "xdg-open " .. url
+    end
+    
+    vim.fn.system(cmd)
+    vim.notify("[plantuml.nvim] Opened " .. url .. " in browser", vim.log.levels.INFO)
+  end
+end
+
 return M

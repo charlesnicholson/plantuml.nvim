@@ -22,3 +22,7 @@ vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnt
 vim.api.nvim_create_user_command("PlantumlUpdate", function()
   plantuml.update_diagram()
 end, { desc = "Manually trigger PlantUML update" })
+
+vim.api.nvim_create_user_command("PlantumlOpen", function()
+  plantuml.open_browser()
+end, { desc = "Open PlantUML web viewer in browser" })
