@@ -1,0 +1,85 @@
+name: Functional Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  functional-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          curl \
+          wget \
+          unzip \
+          xvfb \
+          nodejs \
+          npm
+          
+    - name: Install Neovim 0.11+
+      run: |
+        curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz
+        sudo tar -C /opt -xzf nvim-linux64.tar.gz
+        sudo ln -sf /opt/nvim-linux64/bin/nvim /usr/local/bin/nvim
+        nvim --version
+        
+    - name: Install Playwright
+      run: |
+        npm install -g playwright
+        npx playwright install chromium --with-deps
+        
+    - name: Setup test environment
+      run: |
+        chmod +x ./tests/setup-test-env.sh
+        ./tests/setup-test-env.sh
+        
+    - name: Run plugin loading tests
+      run: |
+        chmod +x ./tests/test-plugin-loading.sh
+        ./tests/test-plugin-loading.sh
+        
+    - name: Start virtual display for browser tests
+      run: |
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        echo "DISPLAY=:99" >> $GITHUB_ENV
+        
+    - name: Run HTTP server tests
+      run: |
+        chmod +x ./tests/test-http-server.sh
+        ./tests/test-http-server.sh
+        
+    - name: Run WebSocket tests
+      run: |
+        chmod +x ./tests/test-websocket.sh
+        ./tests/test-websocket.sh
+        
+    - name: Run PlantUML processing tests
+      run: |
+        chmod +x ./tests/test-plantuml-processing.sh
+        ./tests/test-plantuml-processing.sh
+        
+    - name: Run browser UI interaction tests
+      run: |
+        chmod +x ./tests/test-browser-ui.sh
+        ./tests/test-browser-ui.sh
+        
+    - name: Upload test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-artifacts
+        path: |
+          tests/logs/
+          tests/screenshots/
+        retention-days: 7

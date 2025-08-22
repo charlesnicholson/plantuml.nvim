@@ -1,0 +1,16 @@
+@startuml
+!theme plain
+skinparam monochrome true
+
+participant User
+participant Browser
+participant Plugin
+participant PlantUML
+
+User -> Browser: Opens .puml file
+Browser -> Plugin: WebSocket connect
+Plugin -> Browser: Sends diagram update
+Browser -> PlantUML: Requests PNG
+PlantUML -> Browser: Returns diagram
+Browser -> User: Displays diagram
+@enduml

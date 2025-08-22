@@ -1,0 +1,20 @@
+Testing plugin loading...
+Test 1: Plugin loads without errors
+Plugin loaded successfully✓ Plugin loaded successfully
+Test 2: Check LuaJIT bit library availability
+bit library available✓ LuaJIT bit library available
+Test 3: Plugin exports expected functions
+Function start found✓ Function start exported
+Function stop found✓ Function stop exported
+Function is_running found✓ Function is_running exported
+Function open_browser found✓ Function open_browser exported
+Function update_diagram found✓ Function update_diagram exported
+Function setup found✓ Function setup exported
+Function get_config found✓ Function get_config exported
+Test 4: Plugin starts server successfully
+Server started
+[plantuml.nvim] Server stopped.
+Server stopped✓ Server starts and stops successfully
+Test 5: Plugin configuration works
+Configuration loaded correctly✓ Configuration loaded correctly
+✓ All plugin loading tests passed
