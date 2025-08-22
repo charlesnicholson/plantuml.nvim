@@ -4,33 +4,18 @@ local config = {
   host = "127.0.0.1",
 }
 
-assert(pcall(require, "ffi"), "[plantuml.nvim] Requires LuaJIT with FFI.")
 assert(pcall(require, "bit"), "[plantuml.nvim] Requires LuaJIT 'bit' library.")
-local ffi = require "ffi"
 local bit = require "bit"
+
+local LibDeflate = require("plantuml.vendor.LibDeflate.LibDeflate")
 
 local zlib = {}
 function zlib.deflate(buf)
-  local zlib_name = ffi.os == "Windows" and "zlib1" or "z"
-  local libz = ffi.load(zlib_name)
-
-  ffi.cdef [[
-    typedef unsigned long uLong;
-    int compress(unsigned char *dest, uLong *destLen, const unsigned char *source, uLong sourceLen);
-    uLong compressBound(uLong sourceLen);
-  ]]
-
-  local source_len = #buf
-  local dest_len_val = libz.compressBound(source_len)
-  local dest_len = ffi.new("uLong[1]", dest_len_val)
-  local source = ffi.cast("const unsigned char*", buf)
-  local dest = ffi.new("unsigned char[?]", dest_len[0])
-
-  if libz.compress(dest, dest_len, source, source_len) == 0 then
-    return ffi.string(dest, dest_len[0])
-  else
-    error("[plantuml.nvim] zlib compression failed.")
+  local out = LibDeflate:CompressZlib(buf, { level = 9 })
+  if not out then
+    error("[plantuml.nvim] LibDeflate:CompressZlib failed.")
   end
+  return out
 end
 
 local function encode64_plantuml(data)
@@ -304,6 +289,7 @@ function M.update_diagram()
   end
   local filename = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":t")
   if filename == "" then filename = "untitled.puml" end
+
   local compressed_data = zlib.deflate(buffer_content)
   local encoded_data = encode64_plantuml(compressed_data)
   local plantuml_url = "http://www.plantuml.com/plantuml/png/~1" .. encoded_data
@@ -325,3 +311,4 @@ function M.is_running()
 end
 
 return M
+
