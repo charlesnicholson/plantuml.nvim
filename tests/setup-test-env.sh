@@ -16,7 +16,7 @@ vim.opt.runtimepath:prepend(vim.fn.getcwd())
 
 -- Load the plugin
 require("plantuml").setup({
-  auto_start = true,
+  auto_start = false,
   http_port = 8764,
   auto_launch_browser = "never"
 })
