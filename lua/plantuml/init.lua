@@ -1,8 +1,10 @@
-local config = {
+local default_config = {
+  auto_start = true,
   http_port = 8764,
-  websocket_port = 8765,
-  host = "127.0.0.1",
+  plantuml_server_url = "http://www.plantuml.com/plantuml",
 }
+
+local config = vim.deepcopy(default_config)
 
 assert(pcall(require, "bit"), "[plantuml.nvim] Requires LuaJIT 'bit' library.")
 local bit = require "bit"
@@ -264,7 +266,7 @@ function server.start()
   started = true
 
   local http_server = vim.loop.new_tcp()
-  http_server:bind(config.host, config.http_port)
+  http_server:bind("127.0.0.1", config.http_port)
   http_server:listen(128, function(err)
     assert(not err, err)
     local client = vim.loop.new_tcp()
@@ -279,7 +281,7 @@ function server.start()
   end)
 
   local ws_server = vim.loop.new_tcp()
-  ws_server:bind(config.host, config.websocket_port)
+  ws_server:bind("127.0.0.1", config.http_port + 1)
   ws_server:listen(128, function(err)
     assert(not err, err)
     local client = vim.loop.new_tcp()
@@ -320,7 +322,7 @@ function M.update_diagram()
 
   local compressed_data = zlib.deflate(buffer_content)
   local encoded_data = encode64_plantuml(compressed_data)
-  local plantuml_url = "http://www.plantuml.com/plantuml/png/~1" .. encoded_data
+  local plantuml_url = config.plantuml_server_url .. "/png/~1" .. encoded_data
 
   if #plantuml_url > 8000 then
     vim.notify("PlantUML: Resulting URL is very long and may be rejected by the server.", vim.log.levels.WARN)
@@ -342,7 +344,26 @@ function M.open_browser()
     vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
   end
   
-  vim.ui.open("http://" .. config.host .. ":" .. config.http_port)
+  vim.ui.open("http://127.0.0.1:" .. config.http_port)
+end
+
+function M.stop()
+  if not started then
+    vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
+    return
+  end
+  started = false
+  vim.notify("[plantuml.nvim] Server stopped.", vim.log.levels.INFO)
+end
+
+function M.setup(user_config)
+  if user_config then
+    config = vim.tbl_deep_extend("force", default_config, user_config)
+  end
+end
+
+function M.get_config()
+  return vim.deepcopy(config)
 end
 
 return M

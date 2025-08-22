@@ -4,7 +4,10 @@ if not ok then
   return
 end
 
-plantuml.start()
+local config = plantuml.get_config()
+if config.auto_start then
+  plantuml.start()
+end
 
 local augroup = vim.api.nvim_create_augroup("PlantUMLViewer", { clear = true })
 
@@ -25,3 +28,11 @@ end, { desc = "Manually trigger PlantUML update" })
 vim.api.nvim_create_user_command("PlantumlLaunchBrowser", function()
   plantuml.open_browser()
 end, { desc = "Launch browser to view PlantUML diagrams" })
+
+vim.api.nvim_create_user_command("PlantumlServerStart", function()
+  plantuml.start()
+end, { desc = "Start the PlantUML server" })
+
+vim.api.nvim_create_user_command("PlantumlServerStop", function()
+  plantuml.stop()
+end, { desc = "Stop the PlantUML server" })
