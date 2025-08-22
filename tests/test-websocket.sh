@@ -21,8 +21,8 @@ cleanup() {
 trap cleanup EXIT
 
 # Create WebSocket test script  
-cat > /tmp/websocket_test.js << 'EOF'
-const WebSocket = require('/home/runner/work/plantuml.nvim/plantuml.nvim/node_modules/ws');
+cat > /tmp/websocket_test.js << EOF
+const WebSocket = require('$(pwd)/node_modules/ws');
 
 function testWebSocket() {
     return new Promise((resolve, reject) => {

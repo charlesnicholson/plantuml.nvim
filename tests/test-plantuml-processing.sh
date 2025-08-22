@@ -5,8 +5,8 @@ LOG_FILE="tests/logs/plantuml-processing.log"
 echo "Testing PlantUML processing..." | tee "$LOG_FILE"
 
 # Create WebSocket listener to capture messages
-cat > /tmp/websocket_listener.js << 'EOF'
-const WebSocket = require('/home/runner/work/plantuml.nvim/plantuml.nvim/node_modules/ws');
+cat > /tmp/websocket_listener.js << EOF
+const WebSocket = require('$(pwd)/node_modules/ws');
 
 function listenForUpdates() {
     return new Promise((resolve, reject) => {
