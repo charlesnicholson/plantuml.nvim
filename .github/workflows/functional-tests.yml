@@ -26,12 +26,16 @@ jobs:
           nodejs \
           npm
           
-    - name: Install Neovim 0.11+
+    - name: Install Neovim
+      uses: rhysd/action-setup-vim@v1
+      with:
+        neovim: true
+        version: stable
+        
+    - name: Verify Neovim installation
       run: |
-        curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz
-        sudo tar -C /opt -xzf nvim-linux64.tar.gz
-        sudo ln -sf /opt/nvim-linux64/bin/nvim /usr/local/bin/nvim
         nvim --version
+        which nvim
         
     - name: Install Playwright
       run: |
