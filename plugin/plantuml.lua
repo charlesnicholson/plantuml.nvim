@@ -29,10 +29,10 @@ vim.api.nvim_create_user_command("PlantumlLaunchBrowser", function()
   plantuml.open_browser()
 end, { desc = "Launch browser to view PlantUML diagrams" })
 
-vim.api.nvim_create_user_command("PlantumlStart", function()
+vim.api.nvim_create_user_command("PlantumlServerStart", function()
   plantuml.start()
 end, { desc = "Start the PlantUML server" })
 
-vim.api.nvim_create_user_command("PlantumlStop", function()
+vim.api.nvim_create_user_command("PlantumlServerStop", function()
   plantuml.stop()
 end, { desc = "Stop the PlantUML server" })

@@ -17,9 +17,8 @@ A pure Lua Neovim plugin for automatically rendering PlantUML diagrams in a loca
   opts = {
     auto_start = true,
     http_port = 8764,
-    websocket_port = 8765,
     host = "127.0.0.1",
-    plantuml_server_url = "http://www.plantuml.com/plantuml/png",
+    plantuml_server_url = "http://www.plantuml.com/plantuml",
   }
 }
 ```
@@ -29,7 +28,7 @@ A pure Lua Neovim plugin for automatically rendering PlantUML diagrams in a loca
 require("plantuml").setup({
   auto_start = false,  -- Don't start server automatically
   http_port = 9000,    -- Use different port
-  plantuml_server_url = "http://my-plantuml-server.com/plantuml/png",
+  plantuml_server_url = "http://my-plantuml-server.com/plantuml",
 })
 ```
 
@@ -38,10 +37,9 @@ require("plantuml").setup({
 The plugin supports the following configuration options:
 
 - `auto_start` (boolean, default: `true`) - Whether to automatically start the server when the plugin loads
-- `http_port` (number, default: `8764`) - Port for the HTTP server
-- `websocket_port` (number, default: `8765`) - Port for the WebSocket server  
+- `http_port` (number, default: `8764`) - Port for the HTTP server (WebSocket server uses http_port + 1)
 - `host` (string, default: `"127.0.0.1"`) - Host address to bind the servers to
-- `plantuml_server_url` (string, default: `"http://www.plantuml.com/plantuml/png"`) - Base URL for the PlantUML server (the `~1` component is automatically appended)
+- `plantuml_server_url` (string, default: `"http://www.plantuml.com/plantuml"`) - Base URL for the PlantUML server (the `/png/~1` component is automatically appended)
 
 By default, the plugin starts automatically and runs a server on http://127.0.0.1:8764/. Browse to that page, and it will refresh automatically any time you save, open, or enter a buffer with a filename ending in `.puml`.
 
@@ -51,8 +49,8 @@ The plugin provides the following user commands:
 
 - `:PlantumlUpdate` - Manually trigger a PlantUML diagram update for the current buffer
 - `:PlantumlLaunchBrowser` - Open the PlantUML web viewer in your default browser
-- `:PlantumlStart` - Start the PlantUML server (useful when `auto_start = false`)
-- `:PlantumlStop` - Stop the PlantUML server
+- `:PlantumlServerStart` - Start the PlantUML server (useful when `auto_start = false`)
+- `:PlantumlServerStop` - Stop the PlantUML server
 
 The plugin automatically updates diagrams when you save, open, or enter a buffer with a `.puml` file extension. The `:PlantumlUpdate` command is useful for manual refreshes, while `:PlantumlLaunchBrowser` provides an easy way to open the web viewer without manually navigating to the URL.
 

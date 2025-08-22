@@ -1,9 +1,8 @@
 local default_config = {
   auto_start = true,
   http_port = 8764,
-  websocket_port = 8765,
   host = "127.0.0.1",
-  plantuml_server_url = "http://www.plantuml.com/plantuml/png",
+  plantuml_server_url = "http://www.plantuml.com/plantuml",
 }
 
 local config = vim.deepcopy(default_config)
@@ -283,7 +282,7 @@ function server.start()
   end)
 
   local ws_server = vim.loop.new_tcp()
-  ws_server:bind(config.host, config.websocket_port)
+  ws_server:bind(config.host, config.http_port + 1)
   ws_server:listen(128, function(err)
     assert(not err, err)
     local client = vim.loop.new_tcp()
@@ -324,7 +323,7 @@ function M.update_diagram()
 
   local compressed_data = zlib.deflate(buffer_content)
   local encoded_data = encode64_plantuml(compressed_data)
-  local plantuml_url = config.plantuml_server_url .. "/~1" .. encoded_data
+  local plantuml_url = config.plantuml_server_url .. "/png/~1" .. encoded_data
 
   if #plantuml_url > 8000 then
     vim.notify("PlantUML: Resulting URL is very long and may be rejected by the server.", vim.log.levels.WARN)
@@ -361,10 +360,6 @@ end
 function M.setup(user_config)
   if user_config then
     config = vim.tbl_deep_extend("force", default_config, user_config)
-  end
-  
-  if config.http_port == config.websocket_port then
-    vim.notify("[plantuml.nvim] Warning: HTTP and WebSocket ports are the same. This may cause conflicts.", vim.log.levels.WARN)
   end
 end
 
