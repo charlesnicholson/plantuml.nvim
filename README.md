@@ -14,8 +14,12 @@ It starts automatically and runs a server on http://127.0.0.1:8764/. Browse to t
 
 ## Commands
 
-- `:PlantumlUpdate` - Manually trigger a PlantUML diagram update
-- `:PlantumlLaunchBrowser` - Launch browser to view PlantUML diagrams
+The plugin provides the following user commands:
+
+- `:PlantumlUpdate` - Manually trigger a PlantUML diagram update for the current buffer
+- `:PlantumlLaunchBrowser` - Open the PlantUML web viewer in your default browser (http://127.0.0.1:8764)
+
+The plugin automatically updates diagrams when you save, open, or enter a buffer with a `.puml` file extension. The `:PlantumlUpdate` command is useful for manual refreshes, while `:PlantumlLaunchBrowser` provides an easy way to open the web viewer without manually navigating to the URL.
 
 This was 100% vibe coded but the code doesn't look awful, so whatever. Lots of stuff to improve but the core of it is up and running.
 
