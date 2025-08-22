@@ -197,6 +197,10 @@ local html_content = [[
       try{
         const data=JSON.parse(e.data);
         if(data.type==="update"&&data.url){
+          // Reset to fit-to-page view on every update
+          isFitToPage = true;
+          board.classList.add('fit-to-page');
+
           if (!hasLoadedDiagram) {
             board.classList.add('has-diagram');
             hasLoadedDiagram = true;
