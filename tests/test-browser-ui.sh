@@ -11,8 +11,8 @@ if ! command -v npx &> /dev/null || ! npx playwright --version &> /dev/null; the
 fi
 
 # Create Playwright test script
-cat > /tmp/browser_test.js << EOF
-const { chromium } = require('$(pwd)/node_modules/playwright');
+cat > /tmp/browser_test.js << 'EOF'
+const { chromium } = require('playwright');
 
 (async () => {
   let browser;
