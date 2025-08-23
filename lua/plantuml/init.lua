@@ -219,7 +219,7 @@ local html_content = [[
       }catch(err){console.error(err);}
     };
 
-    ws.onclose = () => { setStatus("err", "Reconnecting..."); setTimeout(connect, 1500); };
+    ws.onclose = () => { setStatus("err", "Reconnecting..."); setTimeout(connect, 1000); };
     ws.onerror = () => setStatus("err","Error");
   }
 

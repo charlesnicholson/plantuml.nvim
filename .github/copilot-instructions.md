@@ -57,14 +57,15 @@ plugin/
 - Diagram viewing modes: `fit-to-page` (default) and full-size (click to toggle)
 - CSS custom properties (variables) for theming: `--bg`, `--fg`, `--muted`, etc.
 - Responsive design with flexbox layout
-- WebSocket reconnection with exponential backoff (1.5s delay)
+- WebSocket reconnection with exponential backoff (1s delay)
 
 ### Constraints & Requirements
 
-#### No Testing Infrastructure
-- **Do not write tests** - this project has no test infrastructure by design
-- **Do not attempt to run tests** - there are none and none should be added
-- All validation is done through manual testing only
+#### Testing Requirements
+- **Always run tests locally** - ensure all tests pass before finishing any task
+- Use the test scripts in `tests/` directory to validate changes
+- Run `./tests/test-plugin-loading.sh`, `./tests/test-websocket.sh`, and other relevant tests
+- All validation should include both automated tests and manual testing
 
 #### NEVER Modify
 - Files in `lua/plantuml/vendor/` - these are pristine third-party libraries
