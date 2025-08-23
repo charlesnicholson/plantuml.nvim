@@ -49,14 +49,10 @@ jobs:
         npx playwright install chromium --with-deps
         
     - name: Setup test environment
-      run: |
-        chmod +x ./tests/setup-test-env.sh
-        ./tests/setup-test-env.sh
+      run: ./tests/setup-test-env.sh
         
     - name: Run plugin loading tests
-      run: |
-        chmod +x ./tests/test-plugin-loading.sh
-        ./tests/test-plugin-loading.sh
+      run: ./tests/test-plugin-loading.sh
         
     - name: Start virtual display for browser tests
       run: |
@@ -65,24 +61,16 @@ jobs:
         echo "DISPLAY=:99" >> $GITHUB_ENV
         
     - name: Run HTTP server tests
-      run: |
-        chmod +x ./tests/test-http-server.sh
-        ./tests/test-http-server.sh
+      run: ./tests/test-http-server.sh
         
     - name: Run WebSocket tests
-      run: |
-        chmod +x ./tests/test-websocket.sh
-        ./tests/test-websocket.sh
+      run: ./tests/test-websocket.sh
         
     - name: Run PlantUML processing tests
-      run: |
-        chmod +x ./tests/test-plantuml-processing.sh
-        ./tests/test-plantuml-processing.sh
+      run: ./tests/test-plantuml-processing.sh
         
     - name: Run browser UI interaction tests
-      run: |
-        chmod +x ./tests/test-browser-ui.sh
-        ./tests/test-browser-ui.sh
+      run: ./tests/test-browser-ui.sh
         
     - name: Upload test artifacts
       if: failure()
