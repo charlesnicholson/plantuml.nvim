@@ -188,8 +188,15 @@ local html_content = [[
     statusText.textContent=text;
   }
 
+  function isImageAtNaturalSize() {
+    if (!img.naturalWidth || !img.naturalHeight) return false;
+    const rect = img.getBoundingClientRect();
+    return Math.abs(rect.width - img.naturalWidth) < 1 && Math.abs(rect.height - img.naturalHeight) < 1;
+  }
+
   board.addEventListener('click', () => {
     if (!hasLoadedDiagram) return;
+    if (isFitToPage && isImageAtNaturalSize()) return;
     isFitToPage = !isFitToPage;
     board.classList.toggle('fit-to-page', isFitToPage);
   });
