@@ -142,6 +142,7 @@ local html_content = [[
   .pill.err .dot{background:var(--err)}
   .pill.warn .dot{background:var(--warn)}
   .file{margin-left:.25rem;color:var(--fg);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .info{margin-left:.25rem;color:var(--muted);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .spacer{flex:1}
   .wrap{flex:1;min-height:0;padding:0.75rem}
   .board{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#0c0d10;outline:1px solid #111318;overflow-y:auto;overflow-x:hidden;cursor:pointer}
@@ -157,6 +158,8 @@ local html_content = [[
   <div class="top">
     <span id="status" class="pill"><span class="dot"></span><span id="status-text">connecting</span></span>
     <span class="file" id="file" title="filename">untitled</span>
+    <span class="info" id="timestamp"></span>
+    <span class="info" id="server-url"></span>
     <span class="spacer"></span>
   </div>
   <div class="wrap">
@@ -168,6 +171,7 @@ local html_content = [[
 <script>
   const statusEl=document.getElementById("status"), statusText=document.getElementById("status-text");
   const fileEl=document.getElementById("file"), ph=document.getElementById("ph");
+  const timestampEl=document.getElementById("timestamp"), serverUrlEl=document.getElementById("server-url");
   const img=document.getElementById("img"), board=document.getElementById("board");
   let isFitToPage = true;
   let hasLoadedDiagram = false;
@@ -214,6 +218,8 @@ local html_content = [[
           setStatus("warn", "Reloading...");
           img.style.opacity = 0;
           if(data.filename){fileEl.textContent=data.filename; fileEl.title=data.filename;}
+          if(data.timestamp){timestampEl.textContent="Updated: " + data.timestamp; timestampEl.title="Last update time";}
+          if(data.server_url){serverUrlEl.textContent="Server: " + data.server_url; serverUrlEl.title="PlantUML server URL";}
           ph.style.display="none";
           img.src=data.url;
         }
@@ -399,7 +405,16 @@ function M.update_diagram()
     vim.notify("PlantUML: Resulting URL is very long and may be rejected by the server.", vim.log.levels.WARN)
   end
 
-  server.broadcast({ type = "update", url = plantuml_url, filename = filename })
+  local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+  local server_url = config.plantuml_server_url
+
+  server.broadcast({ 
+    type = "update", 
+    url = plantuml_url, 
+    filename = filename,
+    timestamp = timestamp,
+    server_url = server_url
+  })
 
   if not has_connected_clients() and started then
     if config.auto_launch_browser == "always" then
