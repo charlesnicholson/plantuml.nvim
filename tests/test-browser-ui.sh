@@ -4,6 +4,9 @@ set -euo pipefail
 LOG_FILE="tests/logs/browser-ui.log"
 echo "Testing browser UI interactions..." | tee "$LOG_FILE"
 
+# Create screenshots directory if it doesn't exist
+mkdir -p tests/screenshots
+
 # Check if Playwright is available
 if ! command -v npx &> /dev/null || ! npx playwright --version &> /dev/null; then
     echo "⚠ Playwright not available, skipping browser UI tests" | tee -a "$LOG_FILE"
@@ -11,7 +14,7 @@ if ! command -v npx &> /dev/null || ! npx playwright --version &> /dev/null; the
 fi
 
 # Create Playwright test script
-cat > /tmp/browser_test.js << 'EOF'
+cat > browser_test.js << 'EOF'
 const { chromium } = require('playwright');
 
 (async () => {
@@ -175,6 +178,7 @@ sleep 3
 # Cleanup function
 cleanup() {
     echo "Cleaning up..." | tee -a "$LOG_FILE"
+    rm -f browser_test.js  # Clean up the test script
     kill $NVIM_PID 2>/dev/null || true
     wait $NVIM_PID 2>/dev/null || true
 }
@@ -189,9 +193,11 @@ fi
 
 # Run Playwright tests
 echo "Running Playwright browser tests..." | tee -a "$LOG_FILE"
-if DISPLAY=${DISPLAY:-:99} node /tmp/browser_test.js 2>&1 | tee -a "$LOG_FILE"; then
+if DISPLAY=${DISPLAY:-:99} node browser_test.js 2>&1 | tee -a "$LOG_FILE"; then
     echo "✓ All browser UI tests passed" | tee -a "$LOG_FILE"
+    rm -f browser_test.js  # Clean up the script
 else
     echo "✗ Browser UI tests failed" | tee -a "$LOG_FILE"
+    rm -f browser_test.js  # Clean up the script
     exit 1
 fi
