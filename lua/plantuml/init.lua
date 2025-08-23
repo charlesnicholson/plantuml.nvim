@@ -144,6 +144,7 @@ local html_content = [[
   .pill.err .dot{background:var(--err)}
   .pill.warn .dot{background:var(--warn)}
   .file{color:var(--fg);font-weight:600;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .info{margin-left:.25rem;color:var(--muted);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .server-link{color:var(--muted);font-size:.75rem;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   .server-link:hover{color:var(--fg);text-decoration:underline}
   .timestamp{color:var(--muted);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
