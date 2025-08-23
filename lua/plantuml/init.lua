@@ -225,7 +225,7 @@ local html_content = [[
           img.style.opacity = 0;
           if(data.filename){fileEl.textContent=data.filename; fileEl.title=data.filename;}
           if(data.timestamp){timestampEl.textContent="Updated: " + data.timestamp; timestampEl.title="Last update time";}
-          if(data.url){serverUrlEl.textContent=data.url; serverUrlEl.href=data.url; serverUrlEl.title="Click to open PlantUML diagram"; serverUrlEl.style.display="block";}
+          if(data.url){serverUrlEl.textContent=data.url.length > 70 ? data.url.substring(0, 70) + "..." : data.url; serverUrlEl.href=data.url; serverUrlEl.title="Click to open PlantUML diagram"; serverUrlEl.style.display="block";}
           ph.style.display="none";
           img.src=data.url;
         }
