@@ -4,9 +4,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-LOG_FILE="$SCRIPT_DIR/smart-click-test.log"
+LOG_FILE="$(mktemp -d)/click-behavior-test.log"
 
-echo "Testing smart click behavior..." | tee "$LOG_FILE"
+echo "Testing click behavior..." | tee "$LOG_FILE"
 
 # Start Neovim with plugin in background
 echo "Starting Neovim with plugin..." | tee -a "$LOG_FILE"
@@ -231,4 +231,4 @@ echo "Cleaning up..." | tee -a "$LOG_FILE"
 kill $NVIM_PID 2>/dev/null || true
 wait $NVIM_PID 2>/dev/null || true
 
-echo "Smart click behavior test completed successfully!" | tee -a "$LOG_FILE"
+echo "Click behavior test completed successfully!" | tee -a "$LOG_FILE"
