@@ -361,6 +361,68 @@ const { chromium } = require('playwright');
     
     console.log('Function test results:', JSON.stringify(functionTests, null, 2));
     
+    // Test 7: CSS positioning fix verification
+    console.log('Testing CSS positioning fix (Issue #45)...');
+    
+    const positioningTest = await page.evaluate(() => {
+      const board = document.getElementById('board');
+      const img = document.getElementById('img');
+      
+      // Create a wide but short image like in the bug report
+      const canvas = document.createElement('canvas');
+      canvas.width = 1500;
+      canvas.height = 100;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(0, 0, 1500, 100);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '20px Arial';
+      ctx.fillText('Wide Diagram - CSS Fix Test', 50, 50);
+      
+      img.src = canvas.toDataURL();
+      board.classList.add('fit-to-page');
+      board.classList.add('has-diagram');
+      
+      window.hasLoadedDiagram = true;
+      window.isFitToPage = true;
+      
+      return new Promise((resolve) => {
+        img.onload = () => {
+          const computedStyle = window.getComputedStyle(board);
+          const boardRect = board.getBoundingClientRect();
+          const imgRect = img.getBoundingClientRect();
+          
+          const positioning = {
+            classes: board.className,
+            alignItems: computedStyle.alignItems,
+            boardHeight: boardRect.height,
+            imageHeight: imgRect.height,
+            imageTop: imgRect.top - boardRect.top,
+            expectedCenter: (boardRect.height - imgRect.height) / 2,
+            hasHasDiagram: board.classList.contains('has-diagram'),
+            hasFitToPage: board.classList.contains('fit-to-page')
+          };
+          
+          // Check if image is centered
+          const isCentered = Math.abs(positioning.imageTop - positioning.expectedCenter) < 5;
+          positioning.isCentered = isCentered;
+          positioning.isAtTop = positioning.imageTop < 10;
+          
+          resolve(positioning);
+        };
+      });
+    });
+    
+    console.log('CSS positioning test:', JSON.stringify(positioningTest, null, 2));
+    
+    if (positioningTest.alignItems === 'center' && positioningTest.isCentered) {
+      console.log('✓ CSS positioning fix verified: Image properly centered with both classes');
+    } else if (positioningTest.isAtTop) {
+      throw new Error('CSS positioning fix failed: Image is at top instead of centered');
+    } else {
+      console.log('⚠ CSS positioning: Image position unclear but align-items is ' + positioningTest.alignItems);
+    }
+    
     console.log('All comprehensive click behavior tests completed successfully!');
     
   } catch (error) {

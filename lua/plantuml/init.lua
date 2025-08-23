@@ -154,6 +154,7 @@ local html_content = [[
   .board.has-diagram #img{display:block;width:100%}
   #ph{color:var(--muted);font-size:.9rem;text-align:center;}
   .board.fit-to-page{align-items:center;overflow:hidden}
+  .board.has-diagram.fit-to-page{align-items:center}
   .board.fit-to-page #img{width:auto;height:auto;max-width:100%;max-height:100%}
 </style>
 </head>
