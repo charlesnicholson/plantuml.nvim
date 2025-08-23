@@ -10,9 +10,6 @@ nvim --headless -u ~/.config/nvim/init.lua -c "lua local p = require('plantuml')
 NVIM_PID=$!
 echo "Neovim started with PID: $NVIM_PID" | tee -a "$LOG_FILE"
 
-# Give server time to start
-sleep 5
-
 # Verify both servers are running before proceeding
 echo "Verifying servers are ready..." | tee -a "$LOG_FILE"
 for i in {1..10}; do

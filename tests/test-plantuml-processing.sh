@@ -134,8 +134,8 @@ echo "Test 1: Load PlantUML file and trigger update" | tee -a "$LOG_FILE"
 node /tmp/websocket_listener.js > /tmp/ws_output.log 2>&1 &
 LISTENER_PID=$!
 
-# Give listener time to start
-sleep 1
+# Give listener time to start - reduced from 1s
+sleep 0.5
 
 # Start Neovim with plugin and process file in the same session
 echo "Starting Neovim and processing PlantUML file..." | tee -a "$LOG_FILE"
@@ -237,7 +237,7 @@ echo "Test 8: Test with complex PlantUML content" | tee -a "$LOG_FILE"
 # Start another WebSocket listener
 node /tmp/websocket_listener.js > /tmp/ws_output2.log 2>&1 &
 LISTENER_PID=$!
-sleep 1
+sleep 0.5
 
 # Process complex PlantUML content in a new Neovim session
 nvim --headless -u ~/.config/nvim/init.lua \
