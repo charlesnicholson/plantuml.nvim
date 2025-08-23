@@ -75,12 +75,18 @@ const { chromium } = require('playwright');
     }
     console.log('✓ Server URL element found');
     
-    // Test 2.6: Check for info class styling in CSS
+    // Test 2.6: Check for current layout styling in CSS
     const pageContent = await page.content();
-    if (!pageContent.includes('.info{')) {
-      throw new Error('Info class styling not found in CSS');
+    if (!pageContent.includes('.server-link{')) {
+      throw new Error('Server-link class styling not found in CSS');
     }
-    console.log('✓ Info class styling found in CSS');
+    if (!pageContent.includes('.timestamp{')) {
+      throw new Error('Timestamp class styling not found in CSS');
+    }
+    if (!pageContent.includes('.file-info{')) {
+      throw new Error('File-info class styling not found in CSS');
+    }
+    console.log('✓ Current layout styling found in CSS');
     
     // Test 3: Check initial CSS classes
     const boardClasses = await page.getAttribute('#board', 'class');
