@@ -164,7 +164,7 @@ local html_content = [[
       <span id="status" class="pill"><span class="dot"></span><span id="status-text">connecting</span></span>
     </div>
     <div class="file-info">
-      <span class="file" id="file" title="filename">untitled</span>
+      <span class="file" id="file" title="filename"></span>
       <a class="server-link" id="server-url" href="#" target="_blank" title="PlantUML server URL"></a>
       <span class="timestamp" id="timestamp"></span>
     </div>
