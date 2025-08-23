@@ -1,7 +1,17 @@
 # PlantUML.nvim
-A pure Lua Neovim plugin for automatically rendering PlantUML diagrams in a local web browser.
+A pure Lua Neovim plugin that provides **real-time PlantUML diagram rendering** in your web browser. Edit your `.puml` files in Neovim and watch your diagrams update instantly in the browser whenever you save - no manual refresh needed!
 
 <img width="646" height="515" alt="Screenshot 2025-08-22 at 10 33 37 AM" src="https://github.com/user-attachments/assets/25205bb6-267a-485d-8558-a53a7f5d7a39" />
+
+## How it works
+
+The plugin runs a local HTTP server on `http://127.0.0.1:8764/` with a WebSocket connection for real-time updates. Simply:
+
+1. Open a `.puml` file in Neovim
+2. Browse to the local server URL  
+3. Watch your diagrams update instantly as you save, edit, or switch between PlantUML files
+
+The browser page shows a **Live** status indicator when connected and automatically refreshes diagrams whenever you interact with `.puml` files in Neovim.
 
 ## Installation
 
@@ -47,8 +57,6 @@ The plugin supports the following configuration options:
   - `"always"` - Always launch a browser if no clients are connected when a PlantUML file is opened/saved/etc
   - `"once"` - Only launch a browser once per Neovim session when a PlantUML file is opened/saved/etc
 
-By default, the plugin starts automatically and runs a server on http://127.0.0.1:8764/. Browse to that page, and it will refresh automatically any time you save, open, or enter a buffer with a filename ending in `.puml`. Set `auto_update = false` to disable automatic updates and use manual commands instead.
-
 ## Commands
 
 The plugin provides the following user commands:
@@ -58,8 +66,4 @@ The plugin provides the following user commands:
 - `:PlantumlServerStart` - Start the PlantUML server (useful when `auto_start = false`)
 - `:PlantumlServerStop` - Stop the PlantUML server
 
-The plugin automatically updates diagrams when you save, open, or enter a buffer with a `.puml` file extension (when `auto_update = true`). The `:PlantumlUpdate` command is useful for manual refreshes or when `auto_update = false`, while `:PlantumlLaunchBrowser` provides an easy way to open the web viewer without manually navigating to the URL.
-
-This was 100% vibe coded but the code doesn't look awful, so whatever. Lots of stuff to improve but the core of it is up and running.
-
-Pull requests welcome.
+When `auto_update = true` (default), diagrams update automatically when you save, open, or enter a buffer with a `.puml` file extension. Use `:PlantumlUpdate` for manual refreshes or when automatic updates are disabled.
