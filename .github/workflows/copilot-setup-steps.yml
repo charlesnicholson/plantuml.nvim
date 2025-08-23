@@ -14,7 +14,7 @@ on:
   workflow_call:
 
 jobs:
-  setup-dev-env:
+  copilot-setup-steps:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
