@@ -361,7 +361,165 @@ const { chromium } = require('playwright');
     
     console.log('Function test results:', JSON.stringify(functionTests, null, 2));
     
-    // Test 7: CSS positioning fix verification
+    // Test 7: Wide image click bug reproduction (Issue #47)
+    console.log('Testing wide image click bug reproduction (Issue #47)...');
+    
+    // Test multiple scenarios that might trigger the bug
+    const wideImageScenarios = [
+      { width: 1000, height: 10, boardWidth: 100, description: 'Pathological case from issue description' },
+      { width: 2000, height: 20, boardWidth: 150, description: 'Very wide landscape image' },
+      { width: 800, height: 50, boardWidth: 200, description: 'Wide banner-style image' }
+    ];
+    
+    for (const scenario of wideImageScenarios) {
+      console.log(`Testing scenario: ${scenario.description} (${scenario.width}x${scenario.height} in ${scenario.boardWidth}px board)`);
+      
+      const wideImageTest = await page.evaluate((scenario) => {
+        const board = document.getElementById('board');
+        const img = document.getElementById('img');
+        
+        // Reset board to default first
+        board.style.width = '';
+        board.style.height = '';
+        board.className = 'board';
+        
+        // Create the test image
+        const canvas = document.createElement('canvas');
+        canvas.width = scenario.width;
+        canvas.height = scenario.height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(0, 0, scenario.width, scenario.height);
+        ctx.fillStyle = '#000000';
+        ctx.font = `${Math.min(scenario.height - 2, 12)}px Arial`;
+        ctx.fillText(`${scenario.width}x${scenario.height}`, 5, scenario.height - 2);
+        
+        // Set up the environment to reproduce the bug conditions
+        img.src = canvas.toDataURL();
+        
+        // Make board smaller to force minification as described in issue
+        board.style.width = scenario.boardWidth + 'px';
+        board.style.height = '300px'; // Ensure it's tall enough for image to fit vertically
+        
+        return new Promise((resolve) => {
+          img.onload = () => {
+            // Now set up the plugin state
+            board.classList.add('fit-to-page');
+            board.classList.add('has-diagram');
+            window.hasLoadedDiagram = true;
+            window.isFitToPage = true;
+            
+            // Wait a bit for layout to settle
+            setTimeout(() => {
+              const rect = img.getBoundingClientRect();
+              const boardRect = board.getBoundingClientRect();
+              
+              // Test the helper functions directly
+              const isAtNaturalSizeResult = window.isImageAtNaturalSize ? window.isImageAtNaturalSize() : null;
+              const fitsVerticallyResult = window.doesImageFitVertically ? window.doesImageFitVertically() : null;
+              
+              const manualIsAtNaturalSize = Math.abs(rect.width - img.naturalWidth) < 1 && 
+                                           Math.abs(rect.height - img.naturalHeight) < 1;
+              const manualFitsVertically = img.naturalHeight <= boardRect.height;
+              
+              // Check the condition that should trigger ignore behavior
+              const shouldIgnoreClick = window.isFitToPage && !isAtNaturalSizeResult && fitsVerticallyResult;
+              
+              const testInfo = {
+                scenario: scenario.description,
+                naturalSize: { width: img.naturalWidth, height: img.naturalHeight },
+                renderedSize: { width: Math.round(rect.width), height: Math.round(rect.height) },
+                boardSize: { width: Math.round(boardRect.width), height: Math.round(boardRect.height) },
+                globalState: {
+                  hasLoadedDiagram: window.hasLoadedDiagram,
+                  isFitToPage: window.isFitToPage
+                },
+                helperFunctions: {
+                  isAtNaturalSize: isAtNaturalSizeResult,
+                  fitsVertically: fitsVerticallyResult
+                },
+                manualCalculations: {
+                  isAtNaturalSize: manualIsAtNaturalSize,
+                  fitsVertically: manualFitsVertically
+                },
+                shouldIgnoreClick,
+                conditionBreakdown: {
+                  isFitToPage: window.isFitToPage,
+                  notAtNaturalSize: !isAtNaturalSizeResult,
+                  fitsVertically: fitsVerticallyResult
+                }
+              };
+              
+              resolve(testInfo);
+            }, 100);
+          };
+        });
+      }, scenario);
+      
+      console.log(`Scenario test info:`, JSON.stringify(wideImageTest, null, 2));
+      
+      // Test click behavior for this scenario
+      if (wideImageTest.shouldIgnoreClick) {
+        console.log(`Testing click on ${scenario.description} - should be ignored...`);
+        
+        // Get initial state
+        const initialState = await page.evaluate(() => {
+          const board = document.getElementById('board');
+          const img = document.getElementById('img');
+          return {
+            isFitToPage: window.isFitToPage,
+            hasFitToPageClass: board.classList.contains('fit-to-page'),
+            imgTop: img.getBoundingClientRect().top,
+            boardTop: board.getBoundingClientRect().top,
+            relativePosition: img.getBoundingClientRect().top - board.getBoundingClientRect().top
+          };
+        });
+        
+        console.log(`Initial state:`, initialState);
+        
+        // Click on the image area
+        await page.click('#board');
+        await page.waitForTimeout(300);
+        
+        // Get state after click
+        const afterClickState = await page.evaluate(() => {
+          const board = document.getElementById('board');
+          const img = document.getElementById('img');
+          return {
+            isFitToPage: window.isFitToPage,
+            hasFitToPageClass: board.classList.contains('fit-to-page'),
+            imgTop: img.getBoundingClientRect().top,
+            boardTop: board.getBoundingClientRect().top,
+            relativePosition: img.getBoundingClientRect().top - board.getBoundingClientRect().top
+          };
+        });
+        
+        console.log(`After click state:`, afterClickState);
+        
+        // Check if the click was incorrectly processed
+        const modeChanged = initialState.isFitToPage !== afterClickState.isFitToPage;
+        const classChanged = initialState.hasFitToPageClass !== afterClickState.hasFitToPageClass;
+        const positionChanged = Math.abs(initialState.relativePosition - afterClickState.relativePosition) > 5;
+        
+        const clickWasProcessed = modeChanged || classChanged || positionChanged;
+        
+        if (clickWasProcessed) {
+          console.log(`✗ BUG REPRODUCED in ${scenario.description}!`);
+          console.log(`  - Mode changed: ${modeChanged} (${initialState.isFitToPage} → ${afterClickState.isFitToPage})`);
+          console.log(`  - Class changed: ${classChanged}`);
+          console.log(`  - Position changed: ${positionChanged} (${initialState.relativePosition} → ${afterClickState.relativePosition})`);
+          
+          // We found the bug! Break out of the loop
+          throw new Error('Wide image click bug reproduced - clicks are being processed when they should be ignored');
+        } else {
+          console.log(`✓ Click correctly ignored for ${scenario.description}`);
+        }
+      } else {
+        console.log(`⚠ Scenario ${scenario.description} does not meet ignore conditions - skipping click test`);
+      }
+    }
+    
+    // Test 8: CSS positioning fix verification
     console.log('Testing CSS positioning fix (Issue #45)...');
     
     const positioningTest = await page.evaluate(() => {
