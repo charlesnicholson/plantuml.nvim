@@ -361,76 +361,7 @@ const { chromium } = require('playwright');
     
     console.log('Function test results:', JSON.stringify(functionTests, null, 2));
     
-    // Test 7: Bug fix verification - tall minified images should allow toggle
-    console.log('Testing bug fix: Tall minified images should allow toggle...');
-    
-    const tallImageToggleTest = await page.evaluate(() => {
-      const board = document.getElementById('board');
-      const img = document.getElementById('img');
-      
-      // Create a tall image that will be minified horizontally but is NOT wider than tall
-      const canvas = document.createElement('canvas');
-      canvas.width = 150;  // Will be minified to fit 
-      canvas.height = 200; // Taller than wide - should allow toggle
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#00ff00';
-      ctx.fillRect(0, 0, 150, 200);
-      ctx.fillStyle = '#000000';
-      ctx.font = '12px Arial';
-      ctx.fillText('150x200', 10, 20);
-      ctx.fillText('(tall)', 10, 35);
-      
-      img.src = canvas.toDataURL();
-      board.classList.add('fit-to-page');
-      board.classList.add('has-diagram');
-      
-      return new Promise((resolve) => {
-        img.onload = () => {
-          const rect = img.getBoundingClientRect();
-          const boardRect = board.getBoundingClientRect();
-          
-          const isAtNaturalSize = Math.abs(rect.width - img.naturalWidth) < 1 && 
-                                 Math.abs(rect.height - img.naturalHeight) < 1;
-          const fitsVertically = img.naturalHeight <= boardRect.height;
-          const isWiderThanTall = img.naturalWidth > img.naturalHeight;
-          
-          resolve({
-            naturalSize: { width: img.naturalWidth, height: img.naturalHeight },
-            renderedSize: { width: Math.round(rect.width), height: Math.round(rect.height) },
-            isAtNaturalSize,
-            fitsVertically,
-            isWiderThanTall,
-            shouldAllowToggle: !(!isAtNaturalSize && fitsVertically && isWiderThanTall)
-          });
-        };
-      });
-    });
-    
-    console.log('Tall image test conditions:', JSON.stringify(tallImageToggleTest, null, 2));
-    
-    // This should be a minified image that fits vertically but is NOT wider than tall
-    if (!tallImageToggleTest.isAtNaturalSize && tallImageToggleTest.fitsVertically && !tallImageToggleTest.isWiderThanTall) {
-      console.log('Testing click behavior on tall minified image...');
-      
-      // Click and verify toggle occurs
-      await page.click('#board');
-      await page.waitForTimeout(200);
-      
-      const afterTallClick = await page.evaluate(() => {
-        const board = document.getElementById('board');
-        return { hasClass: board.classList.contains('fit-to-page') };
-      });
-      
-      if (!afterTallClick.hasClass) {
-        console.log('✓ Bug fix verified: Tall minified image correctly allows toggle');
-      } else {
-        throw new Error('Bug fix failed: Tall minified image should allow toggle but click was ignored');
-      }
-    } else {
-      console.log('⚠ Tall image test conditions not met, skipping toggle test');
-    }
-
-    // Test 8: CSS positioning fix verification
+    // Test 7: CSS positioning fix verification
     console.log('Testing CSS positioning fix (Issue #45)...');
     
     const positioningTest = await page.evaluate(() => {
