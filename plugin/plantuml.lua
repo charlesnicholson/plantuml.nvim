@@ -15,7 +15,10 @@ vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnt
   group = augroup,
   callback = function()
     if vim.bo.filetype == "plantuml" then
-      plantuml.update_diagram()
+      local current_config = plantuml.get_config()
+      if current_config.auto_update then
+        plantuml.update_diagram()
+      end
     end
   end,
   desc = "Update PlantUML diagram on file events for plantuml files",

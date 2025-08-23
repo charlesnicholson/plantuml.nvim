@@ -66,6 +66,7 @@ plugin/
 - Use the test scripts in `tests/` directory to validate changes
 - Run `./tests/test-plugin-loading.sh`, `./tests/test-websocket.sh`, and other relevant tests
 - All validation should include both automated tests and manual testing
+- **New test scripts must be added to `.github/workflows/functional-tests.yml`** as new job steps to ensure they run in CI
 
 #### NEVER Modify
 - Files in `lua/plantuml/vendor/` - these are pristine third-party libraries
