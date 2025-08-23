@@ -62,6 +62,26 @@ const { chromium } = require('playwright');
     }
     console.log('✓ Image element found');
     
+    // Test 2.5: Check for new UI elements (timestamp and server URL)
+    const timestampElement = await page.$('#timestamp');
+    if (!timestampElement) {
+      throw new Error('Timestamp element not found');
+    }
+    console.log('✓ Timestamp element found');
+    
+    const serverUrlElement = await page.$('#server-url');
+    if (!serverUrlElement) {
+      throw new Error('Server URL element not found');
+    }
+    console.log('✓ Server URL element found');
+    
+    // Test 2.6: Check for info class styling in CSS
+    const pageContent = await page.content();
+    if (!pageContent.includes('.info{')) {
+      throw new Error('Info class styling not found in CSS');
+    }
+    console.log('✓ Info class styling found in CSS');
+    
     // Test 3: Check initial CSS classes
     const boardClasses = await page.getAttribute('#board', 'class');
     console.log('Initial board classes:', boardClasses);
@@ -217,8 +237,16 @@ echo "Starting Neovim with plugin..." | tee -a "$LOG_FILE"
 nvim --headless -u ~/.config/nvim/init.lua -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" &
 NVIM_PID=$!
 
-# Give server time to start
-sleep 3
+# Wait for server to be ready
+echo "Waiting for server to be ready..." | tee -a "$LOG_FILE"
+for i in {1..10}; do
+    if netstat -tuln 2>/dev/null | grep -q "127.0.0.1:8764"; then
+        echo "HTTP server is listening" | tee -a "$LOG_FILE"
+        break
+    fi
+    echo "Waiting for HTTP server to start (attempt $i/10)..." | tee -a "$LOG_FILE"
+    sleep 1
+done
 
 # Cleanup function
 cleanup() {

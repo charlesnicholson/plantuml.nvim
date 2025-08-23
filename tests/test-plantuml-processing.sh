@@ -134,8 +134,8 @@ echo "Test 1: Load PlantUML file and trigger update" | tee -a "$LOG_FILE"
 node /tmp/websocket_listener.js > /tmp/ws_output.log 2>&1 &
 LISTENER_PID=$!
 
-# Give listener time to start
-sleep 1
+# Give listener time to start - reduced from 1s
+sleep 0.5
 
 # Start Neovim with plugin and process file in the same session
 echo "Starting Neovim and processing PlantUML file..." | tee -a "$LOG_FILE"
@@ -194,8 +194,26 @@ else
     exit 1
 fi
 
-# Test 4: Extract and verify PlantUML URL structure
-echo "Test 4: Verify PlantUML URL structure" | tee -a "$LOG_FILE"
+# Test 4: Verify message contains timestamp field
+echo "Test 4: Verify message contains timestamp field" | tee -a "$LOG_FILE"
+if grep -q '"timestamp"' /tmp/ws_output.log; then
+    echo "✓ Message contains timestamp field" | tee -a "$LOG_FILE"
+else
+    echo "✗ Message does not contain timestamp field" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Test 5: Verify message contains server_url field
+echo "Test 5: Verify message contains server_url field" | tee -a "$LOG_FILE"
+if grep -q '"server_url"' /tmp/ws_output.log; then
+    echo "✓ Message contains server_url field" | tee -a "$LOG_FILE"
+else
+    echo "✗ Message does not contain server_url field" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Test 6: Extract and verify PlantUML URL structure
+echo "Test 6: Verify PlantUML URL structure" | tee -a "$LOG_FILE"
 PLANTUML_URL=$(grep -o 'http://www\.plantuml\.com/plantuml/png/~1[^"]*' /tmp/ws_output.log || true)
 if [ -n "$PLANTUML_URL" ]; then
     echo "✓ PlantUML URL has correct structure: $PLANTUML_URL" | tee -a "$LOG_FILE"
@@ -204,8 +222,8 @@ else
     exit 1
 fi
 
-# Test 5: Verify URL accessibility (basic check)
-echo "Test 5: Verify PlantUML URL accessibility" | tee -a "$LOG_FILE"
+# Test 7: Verify URL accessibility (basic check)
+echo "Test 7: Verify PlantUML URL accessibility" | tee -a "$LOG_FILE"
 if curl -f -s --max-time 10 "$PLANTUML_URL" > /dev/null; then
     echo "✓ PlantUML URL is accessible" | tee -a "$LOG_FILE"
 else
@@ -213,13 +231,13 @@ else
     # Don't fail the test for network issues
 fi
 
-# Test 6: Test with more complex PlantUML content
-echo "Test 6: Test with complex PlantUML content" | tee -a "$LOG_FILE"
+# Test 8: Test with more complex PlantUML content
+echo "Test 8: Test with complex PlantUML content" | tee -a "$LOG_FILE"
 
 # Start another WebSocket listener
 node /tmp/websocket_listener.js > /tmp/ws_output2.log 2>&1 &
 LISTENER_PID=$!
-sleep 1
+sleep 0.5
 
 # Process complex PlantUML content in a new Neovim session
 nvim --headless -u ~/.config/nvim/init.lua \
