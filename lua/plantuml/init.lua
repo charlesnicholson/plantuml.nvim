@@ -240,6 +240,8 @@ local connected_clients = {}
 local started = false
 local browser_launched_this_session = false
 local last_message = nil
+local http_server = nil
+local ws_server = nil
 
 local function encode_ws_frame(payload)
   local len = #payload
@@ -320,7 +322,7 @@ function server.start()
   if started then return end
   started = true
 
-  local http_server = vim.loop.new_tcp()
+  http_server = vim.loop.new_tcp()
   http_server:bind("127.0.0.1", config.http_port)
   http_server:listen(128, function(err)
     assert(not err, err)
@@ -335,7 +337,7 @@ function server.start()
     end)
   end)
 
-  local ws_server = vim.loop.new_tcp()
+  ws_server = vim.loop.new_tcp()
   ws_server:bind("127.0.0.1", config.http_port + 1)
   ws_server:listen(128, function(err)
     assert(not err, err)
@@ -432,6 +434,21 @@ function M.stop()
     return
   end
   started = false
+  
+  for client, _ in pairs(connected_clients) do
+    if client and not client:is_closing() then
+      client:close()
+    end
+  end
+  connected_clients = {}
+  
+  if http_server and not http_server:is_closing() then
+    http_server:close()
+  end
+  if ws_server and not ws_server:is_closing() then
+    ws_server:close()
+  end
+  
   vim.notify("[plantuml.nvim] Server stopped.", vim.log.levels.INFO)
 end
 

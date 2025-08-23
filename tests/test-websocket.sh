@@ -31,6 +31,10 @@ done
 # Cleanup function
 cleanup() {
     echo "Cleaning up..." | tee -a "$LOG_FILE"
+    # Try graceful shutdown first
+    nvim --headless -u ~/.config/nvim/init.lua -c "lua require('plantuml').stop()" -c "quit" 2>/dev/null || true
+    sleep 1
+    # Force kill if still running
     kill $NVIM_PID 2>/dev/null || true
     wait $NVIM_PID 2>/dev/null || true
 }
