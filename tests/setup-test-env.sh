@@ -14,12 +14,8 @@ cat > ~/.config/nvim/init.lua << 'EOF'
 -- Minimal Neovim config for testing plantuml.nvim
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
 
--- Load the plugin
-require("plantuml").setup({
-  auto_start = false,
-  http_port = 8764,
-  auto_launch_browser = "never"
-})
+-- Disable plugin auto-loading to prevent conflicts
+vim.g.loaded_plantuml = 1
 
 -- Setup filetype detection
 vim.filetype.add({

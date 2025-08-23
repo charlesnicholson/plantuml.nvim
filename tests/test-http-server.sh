@@ -6,7 +6,7 @@ echo "Testing HTTP server..." | tee "$LOG_FILE"
 
 # Start Neovim with plugin in background
 echo "Starting Neovim with plugin..." | tee -a "$LOG_FILE"
-nvim --headless -u ~/.config/nvim/init.lua -c "lua require('plantuml').start()" &
+nvim --headless -u ~/.config/nvim/init.lua -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" &
 NVIM_PID=$!
 
 # Give server time to start

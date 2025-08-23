@@ -4,6 +4,11 @@ set -euo pipefail
 LOG_FILE="tests/logs/plantuml-processing.log"
 echo "Testing PlantUML processing..." | tee "$LOG_FILE"
 
+# Initialize all PID variables to avoid unbound variable errors
+NVIM_PID=""
+NVIM_PID2=""
+LISTENER_PID=""
+
 # Create WebSocket listener to capture messages
 cat > /tmp/websocket_listener.js << EOF
 const WebSocket = require('$(pwd)/node_modules/ws');
@@ -125,59 +130,38 @@ EOF
 # Test 1: Load PlantUML file and trigger update
 echo "Test 1: Load PlantUML file and trigger update" | tee -a "$LOG_FILE"
 
-# Start Neovim with plugin in background first
-echo "Starting Neovim server..." | tee -a "$LOG_FILE"
-nvim --headless -u ~/.config/nvim/init.lua \
-    -c "lua require('plantuml').start()" \
-    -c "while true do vim.loop.run('nowait') end" &
-NVIM_PID=$!
-
-# Give server time to start
-sleep 3
-
-# Verify servers are running
-echo "Verifying servers are ready..." | tee -a "$LOG_FILE"
-for i in {1..10}; do
-    if netstat -ln | grep ":8764" && netstat -ln | grep ":8765"; then
-        echo "Both servers are listening" | tee -a "$LOG_FILE"
-        break
-    fi
-    if [ $i -eq 10 ]; then
-        echo "Servers not ready after 10 seconds" | tee -a "$LOG_FILE"
-        kill $NVIM_PID 2>/dev/null || true
-        exit 1
-    fi
-    sleep 1
-done
-
-# Start WebSocket listener in background
+# Start WebSocket listener first
 node /tmp/websocket_listener.js > /tmp/ws_output.log 2>&1 &
 LISTENER_PID=$!
 
-# Give listener time to connect
-sleep 2
+# Give listener time to start
+sleep 1
 
-# Process the PlantUML file in the same Neovim instance
-echo "Processing PlantUML file..." | tee -a "$LOG_FILE"
+# Start Neovim with plugin and process file in the same session
+echo "Starting Neovim and processing PlantUML file..." | tee -a "$LOG_FILE"
 nvim --headless -u ~/.config/nvim/init.lua \
+    -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" \
     -c "edit tests/fixtures/simple.puml" \
     -c "set filetype=plantuml" \
+    -c "sleep 3" \
     -c "lua require('plantuml').update_diagram()" \
-    -c "sleep 2" \
+    -c "sleep 3" \
     -c "qall!" 2>&1 | tee -a "$LOG_FILE"
 
-# Wait for listener to capture message
-sleep 3
+# Wait for update to be processed and sent
+sleep 2
+
+# Stop the listener
 kill $LISTENER_PID 2>/dev/null || true
-kill $NVIM_PID 2>/dev/null || true
+LISTENER_PID=""
 
 # Cleanup function for any remaining processes
 cleanup() {
     echo "Cleaning up..." | tee -a "$LOG_FILE"
     # Kill any remaining Neovim processes
-    kill $NVIM_PID 2>/dev/null || true
-    kill $NVIM_PID2 2>/dev/null || true
-    kill $LISTENER_PID 2>/dev/null || true
+    [ -n "$NVIM_PID" ] && kill $NVIM_PID 2>/dev/null || true
+    [ -n "$NVIM_PID2" ] && kill $NVIM_PID2 2>/dev/null || true
+    [ -n "$LISTENER_PID" ] && kill $LISTENER_PID 2>/dev/null || true
     pkill -f "nvim.*headless" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -235,27 +219,21 @@ echo "Test 6: Test with complex PlantUML content" | tee -a "$LOG_FILE"
 # Start another WebSocket listener
 node /tmp/websocket_listener.js > /tmp/ws_output2.log 2>&1 &
 LISTENER_PID=$!
-sleep 2
+sleep 1
 
-# Start another Neovim server for the complex test
+# Process complex PlantUML content in a new Neovim session
 nvim --headless -u ~/.config/nvim/init.lua \
-    -c "lua require('plantuml').start()" \
-    -c "while true do vim.loop.run('nowait') end" &
-NVIM_PID2=$!
-
-sleep 3
-
-# Process complex PlantUML content
-nvim --headless -u ~/.config/nvim/init.lua \
+    -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" \
     -c "edit tests/fixtures/test.puml" \
     -c "set filetype=plantuml" \
+    -c "sleep 3" \
     -c "lua require('plantuml').update_diagram()" \
-    -c "sleep 2" \
+    -c "sleep 3" \
     -c "qall!" 2>&1 | tee -a "$LOG_FILE"
 
-sleep 3
+sleep 2
 kill $LISTENER_PID 2>/dev/null || true
-kill $NVIM_PID2 2>/dev/null || true
+LISTENER_PID=""
 
 if grep -q '"type": "update"' /tmp/ws_output2.log; then
     echo "✓ Complex PlantUML content processed successfully" | tee -a "$LOG_FILE"
