@@ -107,6 +107,19 @@ const { chromium } = require('playwright');
     console.log('WebSocket status:', statusText);
     console.log('✓ WebSocket connection established');
     
+    // Test 4.5: Check initial file element text (should be empty when no image loaded)
+    console.log('Testing initial file element text...');
+    const fileElement = await page.$('#file');
+    if (!fileElement) {
+      throw new Error('File element not found');
+    }
+    const initialFileText = await page.textContent('#file');
+    console.log('Initial file text:', JSON.stringify(initialFileText));
+    if (initialFileText !== '') {
+      throw new Error(`Expected empty file text when no image loaded, but got: "${initialFileText}"`);
+    }
+    console.log('✓ File element is empty when no image is loaded');
+    
     // Test 5: Enable click functionality for testing
     console.log('Enabling click functionality for testing...');
     
