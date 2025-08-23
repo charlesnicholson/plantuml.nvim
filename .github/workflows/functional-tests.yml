@@ -54,6 +54,9 @@ jobs:
     - name: Run plugin loading tests
       run: ./tests/test-plugin-loading.sh
         
+    - name: Run vim help system tests
+      run: ./tests/test-vim-help-system.sh
+        
     - name: Start virtual display for browser tests
       run: |
         export DISPLAY=:99

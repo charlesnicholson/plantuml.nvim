@@ -1,0 +1,16 @@
+:PlantumlLaunchBrowser	plantuml.txt	/*:PlantumlLaunchBrowser*
+:PlantumlServerStart	plantuml.txt	/*:PlantumlServerStart*
+:PlantumlServerStop	plantuml.txt	/*:PlantumlServerStop*
+:PlantumlUpdate	plantuml.txt	/*:PlantumlUpdate*
+g:plantuml_auto_launch_browser	plantuml.txt	/*g:plantuml_auto_launch_browser*
+g:plantuml_auto_start	plantuml.txt	/*g:plantuml_auto_start*
+g:plantuml_auto_update	plantuml.txt	/*g:plantuml_auto_update*
+g:plantuml_http_port	plantuml.txt	/*g:plantuml_http_port*
+g:plantuml_server_url	plantuml.txt	/*g:plantuml_server_url*
+plantuml-commands	plantuml.txt	/*plantuml-commands*
+plantuml-configuration	plantuml.txt	/*plantuml-configuration*
+plantuml-contents	plantuml.txt	/*plantuml-contents*
+plantuml-installation	plantuml.txt	/*plantuml-installation*
+plantuml-introduction	plantuml.txt	/*plantuml-introduction*
+plantuml-usage	plantuml.txt	/*plantuml-usage*
+plantuml.txt	plantuml.txt	/*plantuml.txt*
