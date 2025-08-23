@@ -22,16 +22,14 @@ for i in {1..10}; do
         netstat -ln | grep ":876" | tee -a "$LOG_FILE" || true
         exit 1
     fi
-    sleep 1
+    # Shorter sleep interval for faster detection
+    sleep 0.5
 done
 
 # Cleanup function
 cleanup() {
     echo "Cleaning up..." | tee -a "$LOG_FILE"
-    # Try graceful shutdown first
-    nvim --headless -u ~/.config/nvim/init.lua -c "lua require('plantuml').stop()" -c "quit" 2>/dev/null || true
-    sleep 1
-    # Force kill if still running
+    # Skip graceful shutdown for speed - just force kill
     kill $NVIM_PID 2>/dev/null || true
     wait $NVIM_PID 2>/dev/null || true
 }
@@ -89,19 +87,25 @@ function testWebSocket() {
             resolve(results);
         });
         
-        // Close after 3 seconds instead of 5
+        // Close after 500ms - enough time for handshake and message exchange
         setTimeout(() => {
             ws.close();
-        }, 3000);
+            // Force exit after a short delay if close event doesn't fire
+            setTimeout(() => {
+                resolve(results);
+            }, 100);
+        }, 500);
     });
 }
 
 testWebSocket().then(results => {
     console.log('Test results:', JSON.stringify(results, null, 2));
-    process.exit(results.connected && results.handshake ? 0 : 1);
+    // Force immediate exit to prevent event loop hanging
+    const exitCode = results.connected && results.handshake ? 0 : 1;
+    setTimeout(() => process.exit(exitCode), 50);
 }).catch(err => {
     console.error('Test failed:', err);
-    process.exit(1);
+    setTimeout(() => process.exit(1), 50);
 });
 EOF
 
@@ -123,22 +127,6 @@ if node /tmp/websocket_test.js 2>&1 | tee -a "$LOG_FILE"; then
 else
     echo "✗ WebSocket connection or handshake failed" | tee -a "$LOG_FILE"
     exit 1
-fi
-
-# Test 3: WebSocket upgrade handshake validation - simplified approach
-echo "Test 3: WebSocket upgrade handshake validation" | tee -a "$LOG_FILE"
-
-# Use curl with a short timeout to test WebSocket upgrade
-if timeout 10 curl -i \
-    -H "Connection: Upgrade" \
-    -H "Upgrade: websocket" \
-    -H "Sec-WebSocket-Version: 13" \
-    -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-    http://127.0.0.1:8765/ 2>&1 | tee -a "$LOG_FILE" | grep -q "101 Switching Protocols"; then
-    echo "✓ WebSocket upgrade handshake validation successful" | tee -a "$LOG_FILE"
-else
-    echo "⚠ WebSocket upgrade test inconclusive (may be timing-related)" | tee -a "$LOG_FILE"
-    # Don't fail the test - this is a known timing issue in CI
 fi
 
 echo "✓ All WebSocket tests passed" | tee -a "$LOG_FILE"
