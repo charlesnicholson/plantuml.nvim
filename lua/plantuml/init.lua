@@ -204,7 +204,7 @@ local html_content = [[
   board.addEventListener('click', () => {
     if (!hasLoadedDiagram) return;
     if (isFitToPage && isImageAtNaturalSize()) return;
-    if (isFitToPage && !isImageAtNaturalSize() && doesImageFitVertically()) return;
+    if (isFitToPage && !isImageAtNaturalSize() && doesImageFitVertically() && img.naturalWidth > img.naturalHeight) return;
     isFitToPage = !isFitToPage;
     board.classList.toggle('fit-to-page', isFitToPage);
   });
