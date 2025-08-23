@@ -134,19 +134,20 @@ local html_content = [[
   :root{--bg:#0b0c0e;--fg:#d7d7db;--muted:#8b8d94;--pill-bg:#1a1b1e;--ok:#2ea043;--warn:#b8821f;--err:#be3431;--panel:#0f1013}
   *{box-sizing:border-box} html,body{height:100%;overflow:hidden;}
   body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column}
-  .top{display:flex;flex-direction:column;padding:.5rem .75rem;border-bottom:1px solid #111318;background:var(--panel)}
-  .status-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem}
-  .file-info{display:flex;flex-direction:column;gap:.25rem}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border-bottom:1px solid #111318;background:var(--panel)}
+  .status-section{display:flex;align-items:center}
+  .filename-section{display:flex;align-items:center;justify-content:center;flex:1;margin:0 1rem;min-width:0}
+  .info-section{display:flex;flex-direction:column;align-items:flex-end;gap:.25rem}
   .dot{width:.5rem;height:.5rem;border-radius:999px;display:inline-block;vertical-align:middle}
   .pill{display:inline-flex;align-items:center;gap:.35rem;padding:.15rem .45rem;border-radius:999px;background:var(--pill-bg);color:var(--muted);font-size:.75rem;font-weight:500}
   .pill .dot{background:var(--warn)}
   .pill.ok .dot{background:var(--ok)}
   .pill.err .dot{background:var(--err)}
   .pill.warn .dot{background:var(--warn)}
-  .file{color:var(--fg);font-weight:600;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .server-link{color:var(--muted);font-size:.75rem;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .file{color:var(--fg);font-weight:600;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;max-width:100%}
+  .server-link{color:var(--muted);font-size:.75rem;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-align:right}
   .server-link:hover{color:var(--fg);text-decoration:underline}
-  .timestamp{color:var(--muted);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .timestamp{color:var(--muted);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
   .wrap{flex:1;min-height:0;padding:0.75rem}
   .board{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#0c0d10;outline:1px solid #111318;overflow-y:auto;overflow-x:hidden;cursor:pointer}
   .board.has-diagram{align-items:flex-start}
@@ -160,11 +161,13 @@ local html_content = [[
 </head>
 <body>
   <div class="top">
-    <div class="status-row">
+    <div class="status-section">
       <span id="status" class="pill"><span class="dot"></span><span id="status-text">connecting</span></span>
     </div>
-    <div class="file-info">
+    <div class="filename-section">
       <span class="file" id="file" title="filename"></span>
+    </div>
+    <div class="info-section">
       <a class="server-link" id="server-url" href="#" target="_blank" title="PlantUML server URL"></a>
       <span class="timestamp" id="timestamp"></span>
     </div>
@@ -199,6 +202,38 @@ local html_content = [[
     if (!img.naturalWidth || !img.naturalHeight) return false;
     const boardRect = board.getBoundingClientRect();
     return img.naturalHeight <= boardRect.height;
+  }
+
+  function truncateFilename(fullPath, maxWidth) {
+    if (!fullPath) return '';
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = getComputedStyle(fileEl).font;
+    
+    if (ctx.measureText(fullPath).width <= maxWidth) {
+      return fullPath;
+    }
+    
+    const parts = fullPath.split('/');
+    const filename = parts.pop();
+    
+    if (ctx.measureText(filename).width > maxWidth) {
+      return filename;
+    }
+    
+    let truncated = '...' + filename;
+    if (ctx.measureText(truncated).width <= maxWidth) {
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const test = '.../' + parts.slice(i).join('/') + '/' + filename;
+        if (ctx.measureText(test).width <= maxWidth) {
+          truncated = test;
+        } else {
+          break;
+        }
+      }
+    }
+    
+    return truncated;
   }
 
   board.addEventListener('click', () => {
@@ -238,7 +273,13 @@ local html_content = [[
           }
           setStatus("warn", "Reloading...");
           img.style.opacity = 0;
-          if(data.filename){fileEl.textContent=data.filename; fileEl.title=data.filename;}
+          if(data.filename){
+            const filenameSection = document.querySelector('.filename-section');
+            const maxWidth = filenameSection.getBoundingClientRect().width - 20;
+            const truncatedFilename = truncateFilename(data.filename, maxWidth);
+            fileEl.textContent = truncatedFilename;
+            fileEl.title = data.filename;
+          }
           if(data.timestamp){timestampEl.textContent="Updated: " + data.timestamp; timestampEl.title="Last update time";}
           if(data.url){serverUrlEl.textContent=data.url.length > 70 ? data.url.substring(0, 70) + "..." : data.url; serverUrlEl.href=data.url; serverUrlEl.title="Click to open PlantUML diagram"; serverUrlEl.style.display="block";}
           ph.style.display="none";

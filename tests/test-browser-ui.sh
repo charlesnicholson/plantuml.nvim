@@ -83,8 +83,14 @@ const { chromium } = require('playwright');
     if (!pageContent.includes('.timestamp{')) {
       throw new Error('Timestamp class styling not found in CSS');
     }
-    if (!pageContent.includes('.file-info{')) {
-      throw new Error('File-info class styling not found in CSS');
+    if (!pageContent.includes('.filename-section{')) {
+      throw new Error('Filename-section class styling not found in CSS');
+    }
+    if (!pageContent.includes('.status-section{')) {
+      throw new Error('Status-section class styling not found in CSS');
+    }
+    if (!pageContent.includes('.info-section{')) {
+      throw new Error('Info-section class styling not found in CSS');
     }
     console.log('✓ Current layout styling found in CSS');
     
