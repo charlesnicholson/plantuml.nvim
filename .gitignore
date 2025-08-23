@@ -39,3 +39,12 @@ luac.out
 *.x86_64
 *.hex
 
+# Node.js dependencies
+node_modules/
+package-lock.json
+
+# Test artifacts
+tests/logs/
+tests/screenshots/
+browser_test.js
+

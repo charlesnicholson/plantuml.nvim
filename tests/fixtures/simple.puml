@@ -1,0 +1,4 @@
+@startuml
+A -> B: test
+B -> C: response
+@enduml

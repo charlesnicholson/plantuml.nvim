@@ -1,0 +1,13 @@
+{
+  "name": "plantuml-nvim-tests",
+  "version": "1.0.0",
+  "description": "Test dependencies for plantuml.nvim functional tests",
+  "private": true,
+  "dependencies": {
+    "playwright": "^1.55.0",
+    "ws": "^8.18.3"
+  },
+  "scripts": {
+    "test": "echo 'Run ./tests/*.sh scripts individually'"
+  }
+}
