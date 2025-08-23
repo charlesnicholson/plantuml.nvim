@@ -10,48 +10,73 @@ const WebSocket = require('$(pwd)/node_modules/ws');
 
 function listenForUpdates() {
     return new Promise((resolve, reject) => {
-        const ws = new WebSocket('ws://127.0.0.1:8765');
+        let ws;
         let updateReceived = false;
         let messageData = null;
+        let connectionAttempts = 0;
+        const maxAttempts = 5;
         
-        ws.on('open', () => {
-            console.log('WebSocket listener connected');
+        function tryConnect() {
+            connectionAttempts++;
+            console.log('WebSocket connection attempt', connectionAttempts);
             
-            // Send refresh to get any existing messages
-            ws.send(JSON.stringify({type: 'refresh'}));
-        });
-        
-        ws.on('message', (data) => {
-            try {
-                const message = JSON.parse(data.toString());
-                console.log('Received message:', JSON.stringify(message, null, 2));
+            ws = new WebSocket('ws://127.0.0.1:8765');
+            
+            ws.on('open', () => {
+                console.log('WebSocket listener connected');
                 
-                if (message.type === 'update') {
-                    updateReceived = true;
-                    messageData = message;
-                    ws.close();
+                // Send refresh to get any existing messages
+                ws.send(JSON.stringify({type: 'refresh'}));
+            });
+            
+            ws.on('message', (data) => {
+                try {
+                    const message = JSON.parse(data.toString());
+                    console.log('Received message:', JSON.stringify(message, null, 2));
+                    
+                    if (message.type === 'update') {
+                        updateReceived = true;
+                        messageData = message;
+                        ws.close();
+                    }
+                } catch (err) {
+                    console.error('Failed to parse message:', err);
                 }
-            } catch (err) {
-                console.error('Failed to parse message:', err);
-            }
-        });
+            });
+            
+            ws.on('error', (err) => {
+                console.error('WebSocket error:', err.message);
+                if (connectionAttempts < maxAttempts) {
+                    console.log('Retrying connection in 1 second...');
+                    setTimeout(tryConnect, 1000);
+                } else {
+                    reject(err);
+                }
+            });
+            
+            ws.on('close', () => {
+                if (updateReceived) {
+                    resolve({ updateReceived, messageData });
+                } else if (connectionAttempts < maxAttempts) {
+                    console.log('Connection closed, retrying...');
+                    setTimeout(tryConnect, 1000);
+                } else {
+                    resolve({ updateReceived: false, messageData: null });
+                }
+            });
+        }
         
-        ws.on('error', (err) => {
-            console.error('WebSocket error:', err);
-            reject(err);
-        });
+        tryConnect();
         
-        ws.on('close', () => {
-            resolve({ updateReceived, messageData });
-        });
-        
-        // Timeout after 5 seconds instead of 10
+        // Timeout after 15 seconds total
         setTimeout(() => {
             if (!updateReceived) {
                 console.log('No update received within timeout');
             }
-            ws.close();
-        }, 5000);
+            if (ws) {
+                ws.close();
+            }
+        }, 15000);
     });
 }
 
@@ -64,22 +89,6 @@ listenForUpdates().then(result => {
 });
 EOF
 
-# Start Neovim with plugin in background
-echo "Starting Neovim with plugin..." | tee -a "$LOG_FILE"
-nvim --headless -u ~/.config/nvim/init.lua -c "lua require('plantuml').start()" &
-NVIM_PID=$!
-
-# Give server time to start
-sleep 3
-
-# Cleanup function
-cleanup() {
-    echo "Cleaning up..." | tee -a "$LOG_FILE"
-    kill $NVIM_PID 2>/dev/null || true
-    wait $NVIM_PID 2>/dev/null || true
-}
-trap cleanup EXIT
-
 # Test 1: Load PlantUML file and trigger update
 echo "Test 1: Load PlantUML file and trigger update" | tee -a "$LOG_FILE"
 
@@ -90,17 +99,28 @@ LISTENER_PID=$!
 # Give listener time to connect
 sleep 2
 
-# Open PlantUML file in Neovim and trigger update
+# Use a single Neovim instance that starts the server, connects to file, and updates
+echo "Starting Neovim with plugin and processing file..." | tee -a "$LOG_FILE"
 nvim --headless -u ~/.config/nvim/init.lua \
+    -c "lua require('plantuml').start()" \
+    -c "sleep 2" \
     -c "edit tests/fixtures/simple.puml" \
     -c "set filetype=plantuml" \
     -c "lua require('plantuml').update_diagram()" \
-    -c "sleep 2" \
+    -c "sleep 3" \
     -c "qall!" 2>&1 | tee -a "$LOG_FILE"
 
 # Wait for listener to capture message
-sleep 3
+sleep 2
 kill $LISTENER_PID 2>/dev/null || true
+
+# Cleanup function for any remaining processes
+cleanup() {
+    echo "Cleaning up..." | tee -a "$LOG_FILE"
+    # Kill any remaining Neovim processes
+    pkill -f "nvim.*headless" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 # Check if update was received
 if grep -q '"type": "update"' /tmp/ws_output.log; then
@@ -157,15 +177,17 @@ node /tmp/websocket_listener.js > /tmp/ws_output2.log 2>&1 &
 LISTENER_PID=$!
 sleep 2
 
-# Open complex PlantUML file
+# Use single Neovim instance for complex content test
 nvim --headless -u ~/.config/nvim/init.lua \
+    -c "lua require('plantuml').start()" \
+    -c "sleep 2" \
     -c "edit tests/fixtures/test.puml" \
     -c "set filetype=plantuml" \
     -c "lua require('plantuml').update_diagram()" \
-    -c "sleep 2" \
+    -c "sleep 3" \
     -c "qall!" 2>&1 | tee -a "$LOG_FILE"
 
-sleep 3
+sleep 2
 kill $LISTENER_PID 2>/dev/null || true
 
 if grep -q '"type": "update"' /tmp/ws_output2.log; then
