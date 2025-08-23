@@ -194,9 +194,16 @@ local html_content = [[
     return Math.abs(rect.width - img.naturalWidth) < 1 && Math.abs(rect.height - img.naturalHeight) < 1;
   }
 
+  function doesImageFitVertically() {
+    if (!img.naturalWidth || !img.naturalHeight) return false;
+    const boardRect = board.getBoundingClientRect();
+    return img.naturalHeight <= boardRect.height;
+  }
+
   board.addEventListener('click', () => {
     if (!hasLoadedDiagram) return;
     if (isFitToPage && isImageAtNaturalSize()) return;
+    if (isFitToPage && !isImageAtNaturalSize() && doesImageFitVertically()) return;
     isFitToPage = !isFitToPage;
     board.classList.toggle('fit-to-page', isFitToPage);
   });
