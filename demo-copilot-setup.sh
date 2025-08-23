@@ -70,5 +70,5 @@ echo "       skip-virtual-display: 'true'"
 echo ""
 
 echo "7. Demonstration complete!"
-echo "   See .github/COPILOT-SETUP.md for full documentation"
+echo "   See .github/copilot-instructions.md for repository instructions"
 echo "   See .github/workflows/copilot-example.yml for usage examples"

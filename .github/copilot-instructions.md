@@ -1,198 +1,107 @@
-# Copilot Instructions for plantuml.nvim
+# Repository Instructions for GitHub Copilot
 
 ## Project Overview
 
-This is a pure Lua Neovim plugin that provides automatic PlantUML diagram rendering in a local web browser. The plugin runs HTTP and WebSocket servers to deliver real-time diagram updates when `.puml` files are saved in Neovim.
+**plantuml.nvim** is a pure Lua Neovim plugin that provides real-time PlantUML diagram rendering in a web browser. When users edit `.puml` files in Neovim, the plugin automatically updates diagrams in their browser via WebSocket connections.
 
-**Requirements**: Neovim 0.11+ (uses modern APIs and features)
+**Key Features:**
+- Real-time diagram updates as you type and save
+- Local HTTP server (port 8764) with embedded web interface
+- WebSocket server (port 8765) for live updates
+- No external dependencies except LuaJIT's `bit` library
+- Supports Neovim 0.11+
 
-## Architecture & Design Principles
-
-### Core Components
-- **HTTP Server**: Serves the web interface on `127.0.0.1:8764`
-- **WebSocket Server**: Handles real-time updates on port `8765`
-- **PlantUML Integration**: Compresses and encodes diagram content for the PlantUML web service
-- **Embedded Web UI**: HTML, CSS, and JavaScript are embedded directly in `lua/plantuml/init.lua`
-
-### Key Design Decisions
-- **Pure Lua**: No external dependencies except LuaJIT's `bit` library
-- **Self-contained**: All web assets (HTML/CSS/JS) remain embedded in the main Lua file
-- **Vendor preservation**: Third-party code in `vendor/` directories must not be modified
-- **Single-file approach**: Keep the web interface embedded rather than split into separate files
-- **Comment-free**: Code should be self-documenting without comments
-- **Modern Neovim**: Targets Neovim 0.11+ with modern APIs
-
-## Development Guidelines
+## Architecture & Code Organization
 
 ### File Structure
 ```
 lua/plantuml/
-├── init.lua              # Main plugin logic with embedded web UI
+├── init.lua              # Main plugin with embedded web UI (HTML/CSS/JS)
 └── vendor/
-    └── LibDeflate/       # DO NOT MODIFY - third-party compression library
+    └── LibDeflate/       # Third-party compression library (DO NOT MODIFY)
 plugin/
 └── plantuml.lua         # Plugin entry point and autocmds
+tests/                   # Test scripts for validation
 ```
 
-### Code Patterns
+### Core Components
+- **HTTP Server**: Serves web interface on `127.0.0.1:8764`
+- **WebSocket Server**: Handles real-time updates on port `8765`
+- **PlantUML Integration**: Compresses and encodes diagrams for plantuml.com service
+- **Embedded Web UI**: All HTML, CSS, and JavaScript embedded in `lua/plantuml/init.lua`
 
-#### Error Handling
-- Use `assert()` for critical failures (e.g., missing dependencies)
-- Use `vim.notify()` for user-facing warnings/errors
-- Use `vim.schedule()` for UI updates from async contexts
+### Design Principles
+- **Pure Lua**: No external dependencies except LuaJIT's `bit` library
+- **Self-contained**: Web assets embedded in main Lua file (don't split into separate files)
+- **No comments**: Code should be self-documenting
+- **Vendor preservation**: Never modify files in `vendor/` directories
 
-#### Neovim API Usage
-- Prefer `vim.api.*` functions over vim.* when available
+## Development Guidelines
+
+### Code Style
+- Use 2-space indentation (see `.editorconfig`)
+- Use `local M = {}` pattern for module exports
+- Error messages should include "[plantuml.nvim]" prefix
+- Never add comments to code or embedded web assets
+- Prefer `vim.api.*` functions over legacy vim.* when available
+
+### Key APIs and Patterns
 - Use `vim.loop` for async I/O operations (TCP servers, file operations)
-- Use autocmds for file event handling (BufWritePost, BufReadPost, etc.)
-
-#### Server Implementation
-- HTTP responses must include proper headers (`Content-Type`, `Content-Length`)
+- Use `vim.api.nvim_create_autocmd()` for file event handling
 - WebSocket handshake follows RFC 6455 specification
-- Client management uses connection tracking table
-- Graceful cleanup of closed connections
+- HTTP responses must include proper headers (`Content-Type`, `Content-Length`)
+- PlantUML URL construction: `http://www.plantuml.com/plantuml/png/~1{encoded_data}`
 
-#### Web UI Patterns
-- Status indicators use CSS classes: `.pill.ok`, `.pill.err`, `.pill.warn`
-- Diagram viewing modes: `fit-to-page` (default) and full-size (click to toggle)
-- CSS custom properties (variables) for theming: `--bg`, `--fg`, `--muted`, etc.
-- Responsive design with flexbox layout
-- WebSocket reconnection with exponential backoff (1s delay)
+### Configuration Options
+```lua
+require("plantuml").setup({
+  auto_start = true,        -- Auto-start server when plugin loads
+  auto_update = true,       -- Auto-update diagrams on file events
+  http_port = 8764,        -- HTTP server port (WebSocket uses http_port + 1)
+  plantuml_server_url = "http://www.plantuml.com/plantuml",
+  auto_launch_browser = "never",  -- "never", "always", or "once"
+})
+```
 
-### Constraints & Requirements
+## Testing & Validation
 
-#### Testing Requirements
-- **Always run tests locally** - ensure all tests pass before finishing any task
-- Use the test scripts in `tests/` directory to validate changes
-- Run `./tests/test-plugin-loading.sh`, `./tests/test-websocket.sh`, and other relevant tests
-- All validation should include both automated tests and manual testing
-- **New test scripts must be added to `.github/workflows/functional-tests.yml`** as new job steps to ensure they run in CI
+### Running Tests
+The plugin includes comprehensive test scripts in the `tests/` directory:
 
-#### NEVER Modify
-- Files in `lua/plantuml/vendor/` - these are pristine third-party libraries
-- Vendor LICENSE files or documentation
+```bash
+./tests/setup-test-env.sh           # Setup test environment
+./tests/test-plugin-loading.sh      # Test plugin loads correctly
+./tests/test-http-server.sh         # Test HTTP server functionality
+./tests/test-websocket.sh           # Test WebSocket server
+./tests/test-plantuml-processing.sh # Test PlantUML diagram processing
+./tests/test-browser-ui.sh          # Test browser UI (requires display)
+```
 
-#### Keep Embedded
-- HTML, CSS, and JavaScript must remain in `lua/plantuml/init.lua`
-- Do not split web assets into separate files
-- Maintain the single-file simplicity approach
-- **Never add comments** to embedded HTML, CSS, or JavaScript
+**Always run tests locally before making changes** to ensure nothing breaks.
 
-#### WebSocket Protocol
-- Implement proper WebSocket handshaking with Sec-WebSocket-Accept headers
-- Use frame encoding for message transmission
-- Handle client disconnections gracefully
-
-### Testing & Validation
-
-#### Common Issues
+### Common Issues
 - LuaJIT `bit` library availability (required dependency)
 - Port conflicts (8764/8765) - check for other services
 - WebSocket handshake failures - verify Sec-WebSocket-Key handling
 - PlantUML URL length limits (warn at >8000 characters)
-- Network connectivity to plantuml.com service
 
-#### File Patterns to Validate
-- `*.puml` files trigger autocmds
-- Empty/whitespace-only buffers are skipped
-- Untitled buffers default to "untitled.puml"
-- File path handling with special characters
+### User Commands
+- `:PlantumlUpdate` - Manually trigger diagram update
+- `:PlantumlLaunchBrowser` - Open web viewer in browser
+- `:PlantumlServerStart` - Start server (when auto_start = false)
+- `:PlantumlServerStop` - Stop server
 
-### Coding Style
+## Important Constraints
 
-#### Lua Conventions
-- Use 2-space indentation (see `.editorconfig`)
-- Local variables for module imports
-- Consistent error messages with "[plantuml.nvim]" prefix
-- Use `local M = {}` pattern for module exports
-- **Never add comments** - keep code clean and uncommented
+### What NOT to Modify
+- Files in `lua/plantuml/vendor/` - these are pristine third-party libraries
+- Never split embedded HTML/CSS/JS into separate files
+- Don't add comments to code or embedded web assets
 
-#### API Patterns
-- Buffer operations default to current buffer (buf = 0)
-- File paths use `:p` modifier for full paths
-- Async operations use proper callback handling
-- WebSocket frames follow binary encoding spec
-
-### Performance Considerations
-
-- Compression using LibDeflate for PlantUML encoding
-- Connection pooling for WebSocket clients
-- Efficient buffer content reading with `vim.api.nvim_buf_get_lines()`
-- Minimal DOM manipulation in embedded JavaScript
-- PlantUML URL construction: `http://www.plantuml.com/plantuml/png/~1{encoded_data}`
-
-#### PlantUML Encoding Process
-1. Extract buffer content as string
-2. Compress using LibDeflate (zlib compression)
-3. Encode with custom Base64-like encoding (`encode64_plantuml`)
-4. Construct URL with encoded data
-5. Broadcast via WebSocket to connected clients
-
-### Security Notes
-
-- Server binds to localhost only (127.0.0.1)
-- No external network access required
-- PlantUML service calls use HTTP (external dependency)
-- WebSocket connections limited to local clients
-
-### Common Modification Patterns
-
-#### Adding Configuration Options
-```lua
-local config = {
-  http_port = 8764,
-  websocket_port = 8765,
-  host = "127.0.0.1",
-  -- new options here
-}
-```
-
-#### Extending WebSocket Messages
-```lua
-server.broadcast({ 
-  type = "update", 
-  url = plantuml_url, 
-  filename = filename,
-  -- additional fields
-})
-```
-
-#### Adding User Commands
-```lua
-vim.api.nvim_create_user_command("CommandName", function(opts)
-  -- command implementation
-  plantuml.update_diagram()
-end, { 
-  desc = "Command description",
-  nargs = 0,  -- or 1, '?', '*', etc.
-})
-```
-
-#### Adding Autocmd Triggers
-```lua
-vim.api.nvim_create_autocmd({ "Event1", "Event2" }, {
-  group = augroup,
-  pattern = "*.puml",
-  callback = plantuml.update_diagram,
-  desc = "Description of the trigger",
-})
-```
-
-## When Making Changes
-
-1. **Preserve the embedded approach**: Keep HTML/CSS/JS in `lua/plantuml/init.lua`
-2. **No comments**: Never add comments to Lua code or embedded web assets
-3. **Manual testing only**: Verify both HTTP and WebSocket servers work through browser testing
-4. **Validate PlantUML integration**: Ensure diagram updates propagate correctly
-5. **Check browser compatibility**: Test the embedded web interface
-6. **Respect vendor boundaries**: Never modify files in `vendor/` directories
-7. **Maintain simplicity**: This plugin values simplicity over feature complexity
-8. **Neovim 0.11+ only**: Use modern APIs without fallback paths
-
-## References
-
-- [PlantUML Web Service](http://www.plantuml.com/plantuml/)
-- [RFC 6455 - WebSocket Protocol](https://tools.ietf.org/html/rfc6455)
-- [Neovim Lua API Reference](https://neovim.io/doc/user/lua.html)
-- [LuaJIT BitOp Library](http://bitop.luajit.org/)
-- [GitHub Copilot Best Practices](https://gh.io/copilot-coding-agent-tips)
+### When Making Changes
+1. Keep HTML/CSS/JS embedded in `lua/plantuml/init.lua`
+2. Run tests locally to validate changes
+3. Preserve the single-file simplicity approach
+4. Maintain compatibility with Neovim 0.11+
+5. Test both HTTP and WebSocket servers manually
+6. Ensure PlantUML integration still works correctly
