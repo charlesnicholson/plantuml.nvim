@@ -78,6 +78,9 @@ jobs:
     - name: Run auto-update configuration tests
       run: ./tests/test-auto-update-config.sh
         
+    - name: Run new UI elements tests
+      run: ./tests/test-new-ui-elements.sh
+        
     - name: Upload test artifacts
       if: failure()
       uses: actions/upload-artifact@v4
