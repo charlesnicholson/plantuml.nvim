@@ -1,0 +1,152 @@
+*plantuml.txt*	PlantUML diagram viewer for Neovim
+
+Author: Charles Nicholson
+License: Public Domain (Unlicense)
+
+==============================================================================
+CONTENTS						*plantuml-contents*
+
+1. Introduction					|plantuml-introduction|
+2. Installation					|plantuml-installation|
+3. Configuration				|plantuml-configuration|
+4. Commands					|plantuml-commands|
+5. Usage					|plantuml-usage|
+
+==============================================================================
+1. INTRODUCTION						*plantuml-introduction*
+
+PlantUML.nvim is a pure Lua Neovim plugin that provides real-time PlantUML
+diagram rendering in your web browser. Edit your `.puml` files in Neovim and
+watch your diagrams update instantly in the browser whenever you save.
+
+The plugin runs a local HTTP server on `http://127.0.0.1:8764/` with a
+WebSocket connection for real-time updates.
+
+Requirements: Neovim 0.11+
+
+==============================================================================
+2. INSTALLATION						*plantuml-installation*
+
+Using lazy.nvim (minimal setup): >
+    { "charlesnicholson/plantuml.nvim" }
+<
+
+Using lazy.nvim (with configuration): >
+    {
+      "charlesnicholson/plantuml.nvim",
+      opts = {
+        auto_start = true,
+        http_port = 8764,
+        plantuml_server_url = "http://www.plantuml.com/plantuml",
+        auto_launch_browser = "never",
+      }
+    }
+<
+
+Manual setup: >
+    require("plantuml").setup({
+      auto_start = false,
+      auto_update = false,
+      http_port = 9000,
+      plantuml_server_url = "http://my-plantuml-server.com/plantuml",
+      auto_launch_browser = "always",
+    })
+<
+
+==============================================================================
+3. CONFIGURATION					*plantuml-configuration*
+
+The plugin supports the following configuration options:
+
+*g:plantuml_auto_start*
+auto_start~
+	Type: boolean
+	Default: `true`
+	Whether to automatically start the server when the plugin loads.
+
+*g:plantuml_auto_update*
+auto_update~
+	Type: boolean
+	Default: `true`
+	Whether to automatically update diagrams when PlantUML files are
+	saved/opened/entered.
+
+*g:plantuml_http_port*
+http_port~
+	Type: number
+	Default: `8764`
+	Port for the HTTP server. WebSocket server uses http_port + 1.
+
+*g:plantuml_server_url*
+plantuml_server_url~
+	Type: string
+	Default: `"http://www.plantuml.com/plantuml"`
+	Base URL for the PlantUML server. The `/png/~1` component is
+	automatically appended.
+
+*g:plantuml_auto_launch_browser*
+auto_launch_browser~
+	Type: string
+	Default: `"never"`
+	Controls automatic browser launching:
+	- `"never"` - Never automatically launch a browser
+	- `"always"` - Always launch a browser if no clients are connected
+	  when a PlantUML file is opened/saved/etc
+	- `"once"` - Only launch a browser once per Neovim session when a
+	  PlantUML file is opened/saved/etc
+
+==============================================================================
+4. COMMANDS						*plantuml-commands*
+
+							*:PlantumlUpdate*
+:PlantumlUpdate		Manually trigger a PlantUML diagram update for the
+			current buffer.
+
+							*:PlantumlLaunchBrowser*
+:PlantumlLaunchBrowser	Open the PlantUML web viewer in your default browser.
+
+							*:PlantumlServerStart*
+:PlantumlServerStart	Start the PlantUML server. Useful when `auto_start`
+			is set to `false`.
+
+							*:PlantumlServerStop*
+:PlantumlServerStop	Stop the PlantUML server.
+
+==============================================================================
+5. USAGE						*plantuml-usage*
+
+Basic workflow:
+
+1. Open a `.puml` file in Neovim
+2. Browse to `http://127.0.0.1:8764/` in your web browser
+3. Watch your diagrams update instantly as you save, edit, or switch between
+   PlantUML files
+
+The browser page shows a "Live" status indicator when connected and
+automatically refreshes diagrams whenever you interact with `.puml` files
+in Neovim.
+
+When `auto_update` is `true` (default), diagrams update automatically when
+you save, open, or enter a buffer with a `.puml` file extension. Use
+|:PlantumlUpdate| for manual refreshes or when automatic updates are disabled.
+
+Examples:
+
+Start the server manually: >
+    :PlantumlServerStart
+<
+
+Update current diagram: >
+    :PlantumlUpdate
+<
+
+Open browser viewer: >
+    :PlantumlLaunchBrowser
+<
+
+Stop the server: >
+    :PlantumlServerStop
+<
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
