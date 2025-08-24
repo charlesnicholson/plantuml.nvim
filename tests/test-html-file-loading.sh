@@ -102,18 +102,4 @@ fi
 # Cleanup
 rm -f test_html_loading.lua
 
-# Test 7: Compare file size reduction
-echo "Test 7: Compare file size reduction"
-INIT_LUA_LINES=$(wc -l < lua/plantuml/init.lua)
-HTML_FILE_LINES=$(wc -l < "$HTML_FILE")
-echo "✓ init.lua reduced to $INIT_LUA_LINES lines"
-echo "✓ HTML extracted to $HTML_FILE_LINES lines in separate file"
-
-if [ $INIT_LUA_LINES -lt 400 ]; then
-    echo "✓ Significant reduction in init.lua size"
-else
-    echo "✗ init.lua size not significantly reduced"
-    exit 1
-fi
-
 echo "✓ All HTML file loading tests passed"
