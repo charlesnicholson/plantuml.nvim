@@ -193,13 +193,17 @@ local html_content = [[
   }
 
   function isImageAtNaturalSize() {
-    if (!img.naturalWidth || !img.naturalHeight) return false;
+    if (!img.naturalWidth || !img.naturalHeight) {
+      return false;
+    }
     const rect = img.getBoundingClientRect();
     return Math.abs(rect.width - img.naturalWidth) < 1 && Math.abs(rect.height - img.naturalHeight) < 1;
   }
 
   function doesImageFitVertically() {
-    if (!img.naturalWidth || !img.naturalHeight) return false;
+    if (!img.naturalWidth || !img.naturalHeight) {
+      return false;
+    }
     const boardRect = board.getBoundingClientRect();
     return img.naturalHeight <= boardRect.height;
   }
@@ -247,9 +251,18 @@ local html_content = [[
   window.truncateFilename = truncateFilename;
 
   board.addEventListener('click', () => {
-    if (!hasLoadedDiagram) return;
-    if (isFitToPage && isImageAtNaturalSize()) return;
-    if (isFitToPage && !isImageAtNaturalSize() && doesImageFitVertically()) return;
+    if (!hasLoadedDiagram) {
+      return;
+    }
+    
+    if (isFitToPage && isImageAtNaturalSize()) {
+      return;
+    }
+    
+    if (isFitToPage && !isImageAtNaturalSize() && img.naturalWidth > img.naturalHeight) {
+      return;
+    }
+    
     isFitToPage = !isFitToPage;
     board.classList.toggle('fit-to-page', isFitToPage);
   });
@@ -304,6 +317,7 @@ local html_content = [[
 
   img.onload = () => {
     img.style.opacity = 1;
+    hasLoadedDiagram = true;
     setStatus("ok", "Live");
   };
 
