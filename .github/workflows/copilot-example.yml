@@ -10,60 +10,61 @@ jobs:
   # Example 1: Using the reusable workflow
   setup-with-workflow:
     uses: ./.github/workflows/copilot-setup-steps.yml
-
+    
   # Example 2: Using Docker container in a custom job
   custom-development-flow:
     runs-on: ubuntu-latest
-
+    
     container:
       image: ghcr.io/charlesnicholson/docker-image:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-
+        
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
+      
+    - name: Install Node.js dependencies
+      run: npm install
+      
     - name: Install Playwright
-      run: |
-        npm install
-        npx playwright install chromium --with-deps
-
+      run: npx playwright install chromium --with-deps
+      
     - name: Setup test environment
       run: ./tests/setup-test-env.sh
-
+      
     - name: Start virtual display for browser tests
       run: |
         export DISPLAY=:99
         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
         echo "DISPLAY=:99" >> $GITHUB_ENV
-
+      
     - name: Run specific test
       run: ./tests/test-plugin-loading.sh
-
+      
     - name: Make and test changes
       run: |
         echo "This is where Copilot would make code changes"
         echo "Then run targeted tests to validate changes"
-
+        
   # Example 3: Minimal setup for quick testing
   quick-test:
     runs-on: ubuntu-latest
-
+    
     container:
       image: ghcr.io/charlesnicholson/docker-image:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-
+        
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
+      
     - name: Setup minimal environment (no browser dependencies)
       run: ./tests/setup-test-env.sh
-
+        
     - name: Run basic tests only
       run: |
         ./tests/test-plugin-loading.sh
