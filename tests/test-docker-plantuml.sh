@@ -161,17 +161,57 @@ cleanup
 echo "Test 3: Test HTTP connectivity to Docker PlantUML server"
 
 # Start container for HTTP test
-docker run -d --name $CONTAINER_NAME -p $HOST_PORT:$INTERNAL_PORT $DOCKER_IMAGE
+CONTAINER_ID=$(docker run -d --name $CONTAINER_NAME -p $HOST_PORT:$INTERNAL_PORT $DOCKER_IMAGE)
+echo "Started container with ID: $CONTAINER_ID"
 
-# Wait for server to be ready
+# Wait for container to be running first
+echo "Waiting for container to be in running state..."
+for i in {1..15}; do
+    CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo "unknown")
+    if [ "$CONTAINER_STATUS" = "running" ]; then
+        echo "✓ Container is running"
+        break
+    fi
+    if [ $i -eq 15 ]; then
+        echo "✗ Container failed to reach running state"
+        echo "Container status: $CONTAINER_STATUS"
+        docker logs $CONTAINER_NAME 2>/dev/null || echo "No logs available"
+        exit 1
+    fi
+    sleep 1
+done
+
+# Wait for server to be ready with extended timeout and better diagnostics
 echo "Waiting for PlantUML server to be ready..."
-for i in {1..30}; do
-    if curl -s http://localhost:$HOST_PORT/ > /dev/null 2>&1; then
+for i in {1..60}; do
+    # Check if container is still running
+    CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo "unknown")
+    if [ "$CONTAINER_STATUS" != "running" ]; then
+        echo "✗ Container stopped unexpectedly with status: $CONTAINER_STATUS"
+        docker logs $CONTAINER_NAME 2>/dev/null || echo "No logs available"
+        exit 1
+    fi
+    
+    # Try to connect to the server
+    if curl -s --connect-timeout 2 --max-time 5 http://localhost:$HOST_PORT/ > /dev/null 2>&1; then
         echo "✓ PlantUML server is responding"
         break
     fi
-    if [ $i -eq 30 ]; then
-        echo "✗ PlantUML server failed to start within 30 seconds"
+    
+    # Log progress every 10 seconds
+    if [ $((i % 10)) -eq 0 ]; then
+        echo "Still waiting... (attempt $i/60)"
+        # Check what's listening on the port
+        netstat -tuln | grep ":$HOST_PORT " || echo "Port $HOST_PORT not bound"
+    fi
+    
+    if [ $i -eq 60 ]; then
+        echo "✗ PlantUML server failed to start within 60 seconds"
+        echo "Final container status: $(docker inspect --format='{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo 'unknown')"
+        echo "Container logs:"
+        docker logs $CONTAINER_NAME 2>/dev/null || echo "No logs available"
+        echo "Network status:"
+        netstat -tuln | grep ":$HOST_PORT " || echo "Port $HOST_PORT not bound"
         exit 1
     fi
     sleep 1
@@ -232,17 +272,29 @@ echo "Test 4: Test container reuse behavior"
 
 # Start a container manually to simulate existing container
 echo "Starting PlantUML container manually..."
-docker run -d --name $CONTAINER_NAME -p $HOST_PORT:$INTERNAL_PORT $DOCKER_IMAGE
+CONTAINER_ID=$(docker run -d --name $CONTAINER_NAME -p $HOST_PORT:$INTERNAL_PORT $DOCKER_IMAGE)
+echo "Started container with ID: $CONTAINER_ID"
 
-# Wait for server to be ready
+# Wait for server to be ready with better diagnostics
 echo "Waiting for PlantUML server to be ready..."
-for i in {1..30}; do
-    if curl -s http://localhost:$HOST_PORT/ > /dev/null 2>&1; then
+for i in {1..45}; do
+    # Check if container is still running
+    CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo "unknown")
+    if [ "$CONTAINER_STATUS" != "running" ]; then
+        echo "✗ Container stopped unexpectedly with status: $CONTAINER_STATUS"
+        docker logs $CONTAINER_NAME 2>/dev/null || echo "No logs available"
+        exit 1
+    fi
+    
+    if curl -s --connect-timeout 2 --max-time 5 http://localhost:$HOST_PORT/ > /dev/null 2>&1; then
         echo "✓ PlantUML server is responding"
         break
     fi
-    if [ $i -eq 30 ]; then
-        echo "✗ PlantUML server failed to start within 30 seconds"
+    if [ $i -eq 45 ]; then
+        echo "✗ PlantUML server failed to start within 45 seconds"
+        echo "Final container status: $(docker inspect --format='{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo 'unknown')"
+        echo "Container logs:"
+        docker logs $CONTAINER_NAME 2>/dev/null || echo "No logs available"
         exit 1
     fi
     sleep 1
