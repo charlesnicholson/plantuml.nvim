@@ -1,14 +1,19 @@
 local M = {}
 
 local function run_command(cmd, callback)
+  vim.notify("[plantuml.nvim] Docker debug: Executing command: " .. cmd, vim.log.levels.DEBUG)
   local handle = io.popen(cmd .. " 2>&1")
   if not handle then
-    if callback then callback(nil, "Failed to execute command") end
-    return nil, "Failed to execute command"
+    local err_msg = "Failed to execute command"
+    vim.notify("[plantuml.nvim] Docker debug: " .. err_msg, vim.log.levels.DEBUG)
+    if callback then callback(nil, err_msg) end
+    return nil, err_msg
   end
   
   local result = handle:read("*all")
   local success = handle:close()
+  
+  vim.notify("[plantuml.nvim] Docker debug: Command result (success=" .. tostring(success) .. "): " .. (result or "nil"), vim.log.levels.DEBUG)
   
   if callback then
     callback(success and result or nil, success and nil or result)
@@ -26,35 +31,49 @@ local function get_docker_cmd()
 end
 
 function M.is_docker_available()
+  vim.notify("[plantuml.nvim] Docker debug: Checking Docker availability", vim.log.levels.DEBUG)
   local docker_cmd = get_docker_cmd()
+  vim.notify("[plantuml.nvim] Docker debug: Using Docker command: " .. docker_cmd, vim.log.levels.DEBUG)
   local result, err = run_command(docker_cmd .. " --version")
-  return result ~= nil and result:match("Docker version"), err
+  local available = result ~= nil and result:match("Docker version")
+  vim.notify("[plantuml.nvim] Docker debug: Docker available: " .. tostring(available) .. (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
+  return available, err
 end
 
 function M.is_docker_running()
+  vim.notify("[plantuml.nvim] Docker debug: Checking if Docker daemon is running", vim.log.levels.DEBUG)
   local docker_cmd = get_docker_cmd()
   local result, err = run_command(docker_cmd .. " info")
-  return result ~= nil and not result:match("Cannot connect to the Docker daemon"), err
+  local is_running = result ~= nil and not result:match("Cannot connect to the Docker daemon")
+  vim.notify("[plantuml.nvim] Docker debug: Docker daemon running: " .. tostring(is_running) .. (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
+  return is_running, err
 end
 
 function M.get_container_status(container_name)
+  vim.notify("[plantuml.nvim] Docker debug: Getting container status for: " .. container_name, vim.log.levels.DEBUG)
   local docker_cmd = get_docker_cmd()
   local cmd = string.format('%s ps -a --filter "name=%s" --format "{{.Status}}"', docker_cmd, container_name)
   local result, err = run_command(cmd)
   
   if not result or result:match("^%s*$") then
+    vim.notify("[plantuml.nvim] Docker debug: Container not found or empty result", vim.log.levels.DEBUG)
     return "not_found", nil
   end
   
   result = result:gsub("%s+$", "")
+  vim.notify("[plantuml.nvim] Docker debug: Raw container status: '" .. result .. "'", vim.log.levels.DEBUG)
   
+  local status
   if result:match("^Up") then
-    return "running", nil
+    status = "running"
   elseif result:match("^Exited") then
-    return "stopped", nil
+    status = "stopped"
   else
-    return "unknown", result
+    status = "unknown"
   end
+  
+  vim.notify("[plantuml.nvim] Docker debug: Parsed container status: " .. status, vim.log.levels.DEBUG)
+  return status, status == "unknown" and result or nil
 end
 
 function M.get_container_port(container_name, internal_port)
@@ -75,21 +94,34 @@ function M.get_container_port(container_name, internal_port)
 end
 
 function M.start_container(container_name, image, host_port, internal_port)
+  vim.notify("[plantuml.nvim] Docker debug: Starting container - name: " .. container_name .. 
+             ", image: " .. image .. ", host_port: " .. host_port .. ", internal_port: " .. internal_port, vim.log.levels.DEBUG)
   local docker_cmd = get_docker_cmd()
   
   local status, _ = M.get_container_status(container_name)
+  vim.notify("[plantuml.nvim] Docker debug: Current container status: " .. status, vim.log.levels.DEBUG)
   
   if status == "running" then
+    vim.notify("[plantuml.nvim] Docker debug: Container already running, returning success", vim.log.levels.DEBUG)
     return true, "Container already running"
   elseif status == "stopped" then
+    vim.notify("[plantuml.nvim] Docker debug: Container exists but stopped, attempting to start", vim.log.levels.DEBUG)
     local cmd = string.format('%s start %s', docker_cmd, container_name)
     local result, err = run_command(cmd)
-    return result ~= nil, err or "Failed to start existing container"
+    local success = result ~= nil
+    vim.notify("[plantuml.nvim] Docker debug: Container start result: " .. tostring(success) .. 
+               (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
+    return success, err or "Failed to start existing container"
   else
+    vim.notify("[plantuml.nvim] Docker debug: Container not found, creating new container", vim.log.levels.DEBUG)
     local cmd = string.format('%s run -d --name %s -p %d:%d %s', 
                              docker_cmd, container_name, host_port, internal_port, image)
+    vim.notify("[plantuml.nvim] Docker debug: Docker run command: " .. cmd, vim.log.levels.DEBUG)
     local result, err = run_command(cmd)
-    return result ~= nil, err or "Failed to create and start container"
+    local success = result ~= nil
+    vim.notify("[plantuml.nvim] Docker debug: Container creation result: " .. tostring(success) .. 
+               (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
+    return success, err or "Failed to create and start container"
   end
 end
 
@@ -109,24 +141,32 @@ end
 
 function M.wait_for_container_ready(container_name, timeout_seconds)
   timeout_seconds = timeout_seconds or 30
+  vim.notify("[plantuml.nvim] Docker debug: Waiting for container to be ready - timeout: " .. timeout_seconds .. "s", vim.log.levels.DEBUG)
   local start_time = os.time()
   
   while os.time() - start_time < timeout_seconds do
     local status, _ = M.get_container_status(container_name)
+    vim.notify("[plantuml.nvim] Docker debug: Container status during wait: " .. status, vim.log.levels.DEBUG)
     if status == "running" then
+      vim.notify("[plantuml.nvim] Docker debug: Container is now running", vim.log.levels.DEBUG)
       return true, nil
     end
     vim.wait(1000)
   end
   
+  vim.notify("[plantuml.nvim] Docker debug: Container failed to be ready within timeout", vim.log.levels.DEBUG)
   return false, "Container failed to start within timeout"
 end
 
 function M.pull_image(image)
+  vim.notify("[plantuml.nvim] Docker debug: Pulling image: " .. image, vim.log.levels.DEBUG)
   local docker_cmd = get_docker_cmd()
   local cmd = string.format('%s pull %s', docker_cmd, image)
   local result, err = run_command(cmd)
-  return result ~= nil, err
+  local success = result ~= nil
+  vim.notify("[plantuml.nvim] Docker debug: Image pull result: " .. tostring(success) .. 
+             (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
+  return success, err
 end
 
 return M
