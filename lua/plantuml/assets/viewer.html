@@ -360,6 +360,19 @@
             }
             ph.style.display = "none";
             img.src = data.url;
+          } else if (data.type === "docker_status") {
+            // Handle Docker status messages
+            if (data.status) {
+              const statusKind = data.error ? "err" : "warn";
+              setStatus(statusKind, data.status);
+              
+              // If Docker operation completed successfully, transition to Live after a brief delay
+              if (data.completed && !data.error) {
+                setTimeout(() => {
+                  setStatus("ok", "Live");
+                }, 1500);
+              }
+            }
           }
         } catch (err) {
           console.error(err);
