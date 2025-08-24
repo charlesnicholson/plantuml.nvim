@@ -10,61 +10,61 @@ jobs:
   functional-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    
+
     container:
       image: ghcr.io/charlesnicholson/docker-image:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-        
+
     - name: Install Playwright
       run: |
         npm install
         npx playwright install chromium --with-deps
-        
+
     - name: Setup test environment
       run: ./tests/setup-test-env.sh
-        
+
     - name: Run plugin loading tests
       run: ./tests/test-plugin-loading.sh
-        
+
     - name: Run vim help system tests
       run: ./tests/test-vim-help-system.sh
-        
+
     - name: Start virtual display for browser tests
       run: |
         export DISPLAY=:99
         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
         echo "DISPLAY=:99" >> $GITHUB_ENV
-        
+
     - name: Run HTTP server tests
       run: ./tests/test-http-server.sh
-        
+
     - name: Run HTML file loading tests
       run: ./tests/test-html-file-loading.sh
-        
+
     - name: Run WebSocket tests
       run: ./tests/test-websocket.sh
-        
+
     - name: Run PlantUML processing tests
       run: ./tests/test-plantuml-processing.sh
-        
+
     - name: Run browser UI interaction tests
       run: ./tests/test-browser-ui.sh
-        
+
     - name: Run Docker PlantUML tests
       run: ./tests/test-docker-plantuml.sh
-        
+
     - name: Run Docker status UI tests
       run: ./tests/test-docker-status-ui.sh
-        
+
     - name: Run auto-update configuration tests
       run: ./tests/test-auto-update-config.sh
-        
+
     - name: Upload test artifacts
       if: failure()
       uses: actions/upload-artifact@v4
