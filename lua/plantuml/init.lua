@@ -627,19 +627,23 @@ function M.update_diagram()
 end
 
 function M.start()
+  server.start()
+  
   if config.use_docker then
     start_docker_server(function(success, err)
       if not success then
         vim.notify(err, vim.log.levels.ERROR)
-        return
+        server.broadcast({
+          type = "docker_status",
+          operation = "error",
+          status = "Docker startup failed",
+          error = true
+        })
       end
-      server.start()
     end)
-    return true
-  else
-    server.start()
-    return true
   end
+  
+  return true
 end
 
 function M.is_running()

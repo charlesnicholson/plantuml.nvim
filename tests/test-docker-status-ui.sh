@@ -247,7 +247,7 @@ cleanup() {
     kill $NVIM_PID 2>/dev/null || true
     wait $NVIM_PID 2>/dev/null || true
     # Clean up any test containers
-    docker rm -f plantuml-nvim-test 2>/dev/null || true
+    docker rm -f plantuml-nvim 2>/dev/null || true
 }
 trap cleanup EXIT
 
