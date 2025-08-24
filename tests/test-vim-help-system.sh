@@ -1,64 +1,62 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_FILE="tests/logs/vim-help-system.log"
-echo "Testing vim help system integration..." | tee "$LOG_FILE"
 
-# Ensure log directory exists
-mkdir -p tests/logs
+
+echo "Testing vim help system integration..."
 
 # Test 1: Help tags file was generated
-echo "Test 1: Help tags file was generated" | tee -a "$LOG_FILE"
+echo "Test 1: Help tags file was generated"
 if [ -f "doc/tags" ]; then
-    echo "✓ Help tags file exists" | tee -a "$LOG_FILE"
+    echo "✓ Help tags file exists"
 else
-    echo "✗ Help tags file not found" | tee -a "$LOG_FILE"
+    echo "✗ Help tags file not found"
     exit 1
 fi
 
 # Test 2: General plantuml help works
-echo "Test 2: General plantuml help works" | tee -a "$LOG_FILE"
-if nvim --headless -c "help plantuml" -c "qall!" 2>&1 | tee -a "$LOG_FILE"; then
-    echo "✓ General plantuml help accessible" | tee -a "$LOG_FILE"
+echo "Test 2: General plantuml help works"
+if nvim --headless -c "help plantuml" -c "qall!" 2>&1; then
+    echo "✓ General plantuml help accessible"
 else
-    echo "✗ General plantuml help failed" | tee -a "$LOG_FILE"
+    echo "✗ General plantuml help failed"
     exit 1
 fi
 
 # Test 3: Individual command help works
-echo "Test 3: Individual command help works" | tee -a "$LOG_FILE"
+echo "Test 3: Individual command help works"
 COMMANDS="PlantumlUpdate PlantumlLaunchBrowser PlantumlServerStart PlantumlServerStop"
 for cmd in $COMMANDS; do
-    if nvim --headless -c "help :$cmd" -c "qall!" 2>&1 | tee -a "$LOG_FILE"; then
-        echo "✓ Command help for :$cmd works" | tee -a "$LOG_FILE"
+    if nvim --headless -c "help :$cmd" -c "qall!" 2>&1; then
+        echo "✓ Command help for :$cmd works"
     else
-        echo "✗ Command help for :$cmd failed" | tee -a "$LOG_FILE"
+        echo "✗ Command help for :$cmd failed"
         exit 1
     fi
 done
 
 # Test 4: Configuration options help works
-echo "Test 4: Configuration options help works" | tee -a "$LOG_FILE"
+echo "Test 4: Configuration options help works"
 CONFIG_OPTIONS="plantuml-configuration plantuml-commands plantuml-usage"
 for option in $CONFIG_OPTIONS; do
-    if nvim --headless -c "help $option" -c "qall!" 2>&1 | tee -a "$LOG_FILE"; then
-        echo "✓ Help for $option works" | tee -a "$LOG_FILE"
+    if nvim --headless -c "help $option" -c "qall!" 2>&1; then
+        echo "✓ Help for $option works"
     else
-        echo "✗ Help for $option failed" | tee -a "$LOG_FILE"
+        echo "✗ Help for $option failed"
         exit 1
     fi
 done
 
 # Test 5: Help tags contain expected entries
-echo "Test 5: Help tags contain expected entries" | tee -a "$LOG_FILE"
+echo "Test 5: Help tags contain expected entries"
 EXPECTED_TAGS="plantuml.txt PlantumlUpdate PlantumlLaunchBrowser PlantumlServerStart PlantumlServerStop plantuml-commands plantuml-configuration"
 for tag in $EXPECTED_TAGS; do
     if grep -q "$tag" doc/tags; then
-        echo "✓ Tag $tag found in help tags" | tee -a "$LOG_FILE"
+        echo "✓ Tag $tag found in help tags"
     else
-        echo "✗ Tag $tag missing from help tags" | tee -a "$LOG_FILE"
+        echo "✗ Tag $tag missing from help tags"
         exit 1
     fi
 done
 
-echo "✓ All vim help system tests passed" | tee -a "$LOG_FILE"
+echo "✓ All vim help system tests passed"

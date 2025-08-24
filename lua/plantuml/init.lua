@@ -123,210 +123,31 @@ do
   end
 end
 
-local html_content = [[
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PlantUML Viewer</title>
-<style>
-  :root{--bg:#0b0c0e;--fg:#d7d7db;--muted:#8b8d94;--pill-bg:#1a1b1e;--ok:#2ea043;--warn:#b8821f;--err:#be3431;--panel:#0f1013}
-  *{box-sizing:border-box} html,body{height:100%;overflow:hidden;}
-  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column}
-  .top{display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border-bottom:1px solid #111318;background:var(--panel)}
-  .status-section{display:flex;align-items:center}
-  .filename-section{display:flex;align-items:center;justify-content:center;flex:1;margin:0 1rem;min-width:0}
-  .info-section{display:flex;flex-direction:column;align-items:flex-end;gap:.25rem}
-  .dot{width:.5rem;height:.5rem;border-radius:999px;display:inline-block;vertical-align:middle}
-  .pill{display:inline-flex;align-items:center;gap:.35rem;padding:.15rem .45rem;border-radius:999px;background:var(--pill-bg);color:var(--muted);font-size:.75rem;font-weight:500}
-  .pill .dot{background:var(--warn)}
-  .pill.ok .dot{background:var(--ok)}
-  .pill.err .dot{background:var(--err)}
-  .pill.warn .dot{background:var(--warn)}
-  .file{color:var(--fg);font-weight:600;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;max-width:100%}
-  .server-link{color:var(--muted);font-size:.75rem;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-align:right}
-  .server-link:hover{color:var(--fg);text-decoration:underline}
-  .timestamp{color:var(--muted);font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
-  .wrap{flex:1;min-height:0;padding:0.75rem}
-  .board{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#0c0d10;outline:1px solid #111318;overflow-y:auto;overflow-x:hidden;cursor:pointer}
-  .board.has-diagram{align-items:flex-start}
-  #img{display:none;opacity:0;transition:opacity .2s ease-in-out;height:auto;max-width:none;max-height:none}
-  .board.has-diagram #img{display:block;width:100%}
-  #ph{color:var(--muted);font-size:.9rem;text-align:center;}
-  .board.fit-to-page{align-items:center;overflow:hidden}
-  .board.has-diagram.fit-to-page{align-items:center}
-  .board.fit-to-page #img{width:auto;height:auto;max-width:100%;max-height:100%}
-</style>
-</head>
-<body>
-  <div class="top">
-    <div class="status-section">
-      <span id="status" class="pill"><span class="dot"></span><span id="status-text">connecting</span></span>
-    </div>
-    <div class="filename-section">
-      <span class="file" id="file" title="filename"></span>
-    </div>
-    <div class="info-section">
-      <a class="server-link" id="server-url" href="#" target="_blank" title="PlantUML server URL"></a>
-      <span class="timestamp" id="timestamp"></span>
-    </div>
-  </div>
-  <div class="wrap">
-    <div class="board fit-to-page" id="board">
-      <img id="img" alt="PlantUML diagram">
-      <p id="ph">Ready for a diagram.<br>Save a PlantUML file in Neovim to view it here.</p>
-    </div>
-  </div>
-<script>
-  const statusEl=document.getElementById("status"), statusText=document.getElementById("status-text");
-  const fileEl=document.getElementById("file"), ph=document.getElementById("ph");
-  const timestampEl=document.getElementById("timestamp"), serverUrlEl=document.getElementById("server-url");
-  const img=document.getElementById("img"), board=document.getElementById("board");
-  let isFitToPage = true;
-  let hasLoadedDiagram = false;
+local html_content = nil
 
-  function setStatus(kind,text){
-    statusEl.className = 'pill';
-    if(kind) statusEl.classList.add(kind);
-    statusText.textContent=text;
-  }
-
-  function isImageAtNaturalSize() {
-    if (!img.naturalWidth || !img.naturalHeight) {
-      return false;
-    }
-    const rect = img.getBoundingClientRect();
-    return Math.abs(rect.width - img.naturalWidth) < 1 && Math.abs(rect.height - img.naturalHeight) < 1;
-  }
-
-  function doesImageFitVertically() {
-    if (!img.naturalWidth || !img.naturalHeight) {
-      return false;
-    }
-    const boardRect = board.getBoundingClientRect();
-    return img.naturalHeight <= boardRect.height;
-  }
-
-  function truncateFilename(fullPath, maxWidth) {
-    if (!fullPath) return '';
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.font = getComputedStyle(fileEl).font;
-    
-    if (ctx.measureText(fullPath).width <= maxWidth) {
-      return fullPath;
-    }
-    
-    const lastSlashIndex = fullPath.lastIndexOf('/');
-    if (lastSlashIndex === -1) {
-      return fullPath;
-    }
-    
-    const filename = fullPath.substring(lastSlashIndex + 1);
-    
-    if (ctx.measureText(filename).width > maxWidth) {
-      return filename;
-    }
-    
-    let bestTruncated = filename;
-    
-    for (let i = 1; i < fullPath.length; i++) {
-      const remaining = fullPath.substring(i);
-      const truncated = '...' + remaining;
-      
-      if (ctx.measureText(truncated).width <= maxWidth) {
-        if (remaining.indexOf('/') === -1) {
-          return filename;
-        }
-        bestTruncated = truncated;
-      } else {
-        break;
-      }
-    }
-    
-    return bestTruncated;
-  }
-
-  window.truncateFilename = truncateFilename;
-
-  board.addEventListener('click', () => {
-    if (!hasLoadedDiagram) {
-      return;
-    }
-    
-    if (isFitToPage && isImageAtNaturalSize()) {
-      return;
-    }
-    
-    if (isFitToPage && !isImageAtNaturalSize() && img.naturalWidth > img.naturalHeight) {
-      return;
-    }
-    
-    isFitToPage = !isFitToPage;
-    board.classList.toggle('fit-to-page', isFitToPage);
-  });
-
-  function wsPort() {
-    const p = parseInt(location.port || "0", 10);
-    return (p > 0) ? String(p + 1) : "8765";
-  }
-
-  function connect(){
-    const host = location.hostname || "127.0.0.1";
-    const wsUrl = "ws://" + host + ":" + wsPort();
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-      setStatus("ok","Live");
-      ws.send(JSON.stringify({type: "refresh"}));
-    };
-
-    ws.onmessage = e => {
-      try{
-        const data=JSON.parse(e.data);
-        if(data.type==="update"&&data.url){
-          // Reset to fit-to-page view on every update
-          isFitToPage = true;
-          board.classList.add('fit-to-page');
-
-          if (!hasLoadedDiagram) {
-            board.classList.add('has-diagram');
-            hasLoadedDiagram = true;
-          }
-          setStatus("warn", "Reloading...");
-          img.style.opacity = 0;
-          if(data.filename){
-            const filenameSection = document.querySelector('.filename-section');
-            const maxWidth = filenameSection.getBoundingClientRect().width - 20;
-            const truncatedFilename = truncateFilename(data.filename, maxWidth);
-            fileEl.textContent = truncatedFilename;
-            fileEl.title = data.filename;
-          }
-          if(data.timestamp){timestampEl.textContent="Updated: " + data.timestamp; timestampEl.title="Last update time";}
-          if(data.url){serverUrlEl.textContent=data.url.length > 70 ? data.url.substring(0, 70) + "..." : data.url; serverUrlEl.href=data.url; serverUrlEl.title="Click to open PlantUML diagram"; serverUrlEl.style.display="block";}
-          ph.style.display="none";
-          img.src=data.url;
-        }
-      }catch(err){console.error(err);}
-    };
-
-    ws.onclose = () => { setStatus("err", "Reconnecting..."); setTimeout(connect, 1000); };
-    ws.onerror = () => setStatus("err","Error");
-  }
-
-  img.onload = () => {
-    img.style.opacity = 1;
-    hasLoadedDiagram = true;
-    setStatus("ok", "Live");
-  };
-
-  setStatus("warn", "Connecting...");
-  connect();
-</script>
-</body>
-</html>
-]]
+local function load_html_content()
+  if html_content then
+    return html_content
+  end
+  
+  local current_file = debug.getinfo(1).source:sub(2)
+  local plugin_dir = vim.fn.fnamemodify(current_file, ":h")
+  local html_file = plugin_dir .. "/assets/viewer.html"
+  
+  local file = io.open(html_file, "r")
+  if not file then
+    error("[plantuml.nvim] Could not open HTML file: " .. html_file)
+  end
+  
+  html_content = file:read("*all")
+  file:close()
+  
+  if not html_content or html_content == "" then
+    error("[plantuml.nvim] HTML file is empty or could not be read: " .. html_file)
+  end
+  
+  return html_content
+end
 
 local server = {}
 local connected_clients = {}
@@ -423,8 +244,9 @@ function server.start()
     http_server:accept(client)
     client:read_start(function(_, data)
       if data then
+        local content = load_html_content()
         local response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " ..
-          #html_content .. "\r\n\r\n" .. html_content
+          #content .. "\r\n\r\n" .. content
         client:write(response, function() client:close() end)
       end
     end)

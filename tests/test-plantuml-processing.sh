@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_FILE="tests/logs/plantuml-processing.log"
-echo "Testing PlantUML processing..." | tee "$LOG_FILE"
+
+
+echo "Testing PlantUML processing..."
 
 # Initialize all PID variables to avoid unbound variable errors
 NVIM_PID=""
-NVIM_PID2=""
 LISTENER_PID=""
 
 # Create WebSocket listener to capture messages
@@ -128,7 +128,7 @@ listenForUpdates().then(result => {
 EOF
 
 # Test 1: Load PlantUML file and trigger update
-echo "Test 1: Load PlantUML file and trigger update" | tee -a "$LOG_FILE"
+echo "Test 1: Load PlantUML file and trigger update"
 
 # Start WebSocket listener first
 node /tmp/websocket_listener.js > /tmp/ws_output.log 2>&1 &
@@ -138,7 +138,7 @@ LISTENER_PID=$!
 sleep 0.5
 
 # Start Neovim with plugin and process file in the same session
-echo "Starting Neovim and processing PlantUML file..." | tee -a "$LOG_FILE"
+echo "Starting Neovim and processing PlantUML file..."
 nvim --headless -u ~/.config/nvim/init.lua \
     -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" \
     -c "edit tests/fixtures/simple.puml" \
@@ -146,7 +146,7 @@ nvim --headless -u ~/.config/nvim/init.lua \
     -c "sleep 3" \
     -c "lua require('plantuml').update_diagram()" \
     -c "sleep 3" \
-    -c "qall!" 2>&1 | tee -a "$LOG_FILE"
+    -c "qall!" 2>&1
 
 # Wait for update to be processed and sent
 sleep 2
@@ -157,10 +157,9 @@ LISTENER_PID=""
 
 # Cleanup function for any remaining processes
 cleanup() {
-    echo "Cleaning up..." | tee -a "$LOG_FILE"
+    echo "Cleaning up..."
     # Kill any remaining Neovim processes
     [ -n "$NVIM_PID" ] && kill $NVIM_PID 2>/dev/null || true
-    [ -n "$NVIM_PID2" ] && kill $NVIM_PID2 2>/dev/null || true
     [ -n "$LISTENER_PID" ] && kill $LISTENER_PID 2>/dev/null || true
     pkill -f "nvim.*headless" 2>/dev/null || true
 }
@@ -168,71 +167,71 @@ trap cleanup EXIT
 
 # Check if update was received
 if grep -q '"type": "update"' /tmp/ws_output.log; then
-    echo "✓ WebSocket update message received" | tee -a "$LOG_FILE"
+    echo "✓ WebSocket update message received"
 else
-    echo "✗ No WebSocket update message received" | tee -a "$LOG_FILE"
-    echo "WebSocket output:" | tee -a "$LOG_FILE"
-    cat /tmp/ws_output.log | tee -a "$LOG_FILE"
+    echo "✗ No WebSocket update message received"
+    echo "WebSocket output:"
+    cat /tmp/ws_output.log
     exit 1
 fi
 
 # Test 2: Verify message contains URL
-echo "Test 2: Verify message contains PlantUML URL" | tee -a "$LOG_FILE"
+echo "Test 2: Verify message contains PlantUML URL"
 if grep -q '"url"' /tmp/ws_output.log && grep -q 'plantuml.com' /tmp/ws_output.log; then
-    echo "✓ Message contains PlantUML URL" | tee -a "$LOG_FILE"
+    echo "✓ Message contains PlantUML URL"
 else
-    echo "✗ Message does not contain PlantUML URL" | tee -a "$LOG_FILE"
+    echo "✗ Message does not contain PlantUML URL"
     exit 1
 fi
 
 # Test 3: Verify message contains filename
-echo "Test 3: Verify message contains filename" | tee -a "$LOG_FILE"
+echo "Test 3: Verify message contains filename"
 if grep -q '"filename"' /tmp/ws_output.log; then
-    echo "✓ Message contains filename" | tee -a "$LOG_FILE"
+    echo "✓ Message contains filename"
 else
-    echo "✗ Message does not contain filename" | tee -a "$LOG_FILE"
+    echo "✗ Message does not contain filename"
     exit 1
 fi
 
 # Test 4: Verify message contains timestamp field
-echo "Test 4: Verify message contains timestamp field" | tee -a "$LOG_FILE"
+echo "Test 4: Verify message contains timestamp field"
 if grep -q '"timestamp"' /tmp/ws_output.log; then
-    echo "✓ Message contains timestamp field" | tee -a "$LOG_FILE"
+    echo "✓ Message contains timestamp field"
 else
-    echo "✗ Message does not contain timestamp field" | tee -a "$LOG_FILE"
+    echo "✗ Message does not contain timestamp field"
     exit 1
 fi
 
 # Test 5: Verify message contains server_url field
-echo "Test 5: Verify message contains server_url field" | tee -a "$LOG_FILE"
+echo "Test 5: Verify message contains server_url field"
 if grep -q '"server_url"' /tmp/ws_output.log; then
-    echo "✓ Message contains server_url field" | tee -a "$LOG_FILE"
+    echo "✓ Message contains server_url field"
 else
-    echo "✗ Message does not contain server_url field" | tee -a "$LOG_FILE"
+    echo "✗ Message does not contain server_url field"
     exit 1
 fi
 
 # Test 6: Extract and verify PlantUML URL structure
-echo "Test 6: Verify PlantUML URL structure" | tee -a "$LOG_FILE"
+echo "Test 6: Verify PlantUML URL structure"
 PLANTUML_URL=$(grep -o 'http://www\.plantuml\.com/plantuml/png/~1[^"]*' /tmp/ws_output.log || true)
 if [ -n "$PLANTUML_URL" ]; then
-    echo "✓ PlantUML URL has correct structure: $PLANTUML_URL" | tee -a "$LOG_FILE"
+    echo "✓ PlantUML URL has correct structure: $PLANTUML_URL"
 else
-    echo "✗ PlantUML URL has incorrect structure" | tee -a "$LOG_FILE"
+    echo "✗ PlantUML URL has incorrect structure"
     exit 1
 fi
 
 # Test 7: Verify URL accessibility (basic check)
-echo "Test 7: Verify PlantUML URL accessibility" | tee -a "$LOG_FILE"
+echo "Test 7: Verify PlantUML URL accessibility"
 if curl -f -s --max-time 10 "$PLANTUML_URL" > /dev/null; then
-    echo "✓ PlantUML URL is accessible" | tee -a "$LOG_FILE"
+    echo "✓ PlantUML URL is accessible"
 else
-    echo "⚠ PlantUML URL not accessible (may be network issue)" | tee -a "$LOG_FILE"
+    echo "⚠ PlantUML URL not accessible (may be network issue)"
     # Don't fail the test for network issues
 fi
 
 # Test 8: Test with more complex PlantUML content
-echo "Test 8: Test with complex PlantUML content" | tee -a "$LOG_FILE"
+echo "Test 8: Test with complex PlantUML content"
 
 # Start another WebSocket listener
 node /tmp/websocket_listener.js > /tmp/ws_output2.log 2>&1 &
@@ -247,17 +246,17 @@ nvim --headless -u ~/.config/nvim/init.lua \
     -c "sleep 3" \
     -c "lua require('plantuml').update_diagram()" \
     -c "sleep 3" \
-    -c "qall!" 2>&1 | tee -a "$LOG_FILE"
+    -c "qall!" 2>&1
 
 sleep 2
 kill $LISTENER_PID 2>/dev/null || true
 LISTENER_PID=""
 
 if grep -q '"type": "update"' /tmp/ws_output2.log; then
-    echo "✓ Complex PlantUML content processed successfully" | tee -a "$LOG_FILE"
+    echo "✓ Complex PlantUML content processed successfully"
 else
-    echo "✗ Complex PlantUML content processing failed" | tee -a "$LOG_FILE"
+    echo "✗ Complex PlantUML content processing failed"
     exit 1
 fi
 
-echo "✓ All PlantUML processing tests passed" | tee -a "$LOG_FILE"
+echo "✓ All PlantUML processing tests passed"

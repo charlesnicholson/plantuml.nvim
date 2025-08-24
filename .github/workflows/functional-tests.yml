@@ -66,6 +66,9 @@ jobs:
     - name: Run HTTP server tests
       run: ./tests/test-http-server.sh
         
+    - name: Run HTML file loading tests
+      run: ./tests/test-html-file-loading.sh
+        
     - name: Run WebSocket tests
       run: ./tests/test-websocket.sh
         
