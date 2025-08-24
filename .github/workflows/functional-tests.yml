@@ -84,11 +84,11 @@ jobs:
     - name: Run Docker PlantUML tests
       run: ./tests/test-docker-plantuml.sh
         
+    - name: Run Docker status UI tests
+      run: ./tests/test-docker-status-ui.sh
+        
     - name: Run auto-update configuration tests
       run: ./tests/test-auto-update-config.sh
-        
-    - name: Run click behavior tests
-      run: ./tests/test-click-behavior.sh
         
     - name: Upload test artifacts
       if: failure()
