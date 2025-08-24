@@ -71,7 +71,7 @@ print("All Docker API tests passed")
 EOF
 
 nvim --headless --clean \
-    -u /tmp/minimal_init.lua \
+    -u ~/.config/nvim/init.lua \
     -c "luafile /tmp/test_docker_api.lua" \
     -c "qall!" 2>&1
 
@@ -149,7 +149,7 @@ print("All Docker lifecycle tests passed")
 EOF
 
 nvim --headless --clean \
-    -u /tmp/minimal_init.lua \
+    -u ~/.config/nvim/init.lua \
     -c "luafile /tmp/test_docker_lifecycle.lua" \
     -c "qall!" 2>&1
 

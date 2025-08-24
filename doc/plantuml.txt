@@ -53,6 +53,14 @@ Manual setup: >
     })
 <
 
+Docker setup: >
+    require("plantuml").setup({
+      use_docker = true,
+      docker_port = 8080,
+      docker_remove_on_stop = true,
+    })
+<
+
 ==============================================================================
 3. CONFIGURATION					*plantuml-configuration*
 
