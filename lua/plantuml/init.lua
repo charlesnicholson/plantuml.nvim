@@ -214,27 +214,37 @@ local html_content = [[
       return fullPath;
     }
     
-    const parts = fullPath.split('/');
-    const filename = parts.pop();
+    const lastSlashIndex = fullPath.lastIndexOf('/');
+    if (lastSlashIndex === -1) {
+      return fullPath;
+    }
+    
+    const filename = fullPath.substring(lastSlashIndex + 1);
     
     if (ctx.measureText(filename).width > maxWidth) {
       return filename;
     }
     
-    let truncated = '...' + filename;
-    if (ctx.measureText(truncated).width <= maxWidth) {
-      for (let i = parts.length - 1; i >= 0; i--) {
-        const test = '.../' + parts.slice(i).join('/') + '/' + filename;
-        if (ctx.measureText(test).width <= maxWidth) {
-          truncated = test;
-        } else {
-          break;
+    let bestTruncated = filename;
+    
+    for (let i = 1; i < fullPath.length; i++) {
+      const remaining = fullPath.substring(i);
+      const truncated = '...' + remaining;
+      
+      if (ctx.measureText(truncated).width <= maxWidth) {
+        if (remaining.indexOf('/') === -1) {
+          return filename;
         }
+        bestTruncated = truncated;
+      } else {
+        break;
       }
     }
     
-    return truncated;
+    return bestTruncated;
   }
+
+  window.truncateFilename = truncateFilename;
 
   board.addEventListener('click', () => {
     if (!hasLoadedDiagram) return;
