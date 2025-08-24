@@ -13,7 +13,7 @@ local function run_command(cmd, callback)
   local result = handle:read("*all")
   local success = handle:close()
   
-  vim.notify("[plantuml.nvim] Docker debug: Command result (success=" .. tostring(success) .. "): " .. (result or "nil"), vim.log.levels.DEBUG)
+  vim.notify("[plantuml.nvim] Docker debug: Command result (success=" .. tostring(success) .. "): " .. (result and string.sub(result, 1, 100) or "nil"), vim.log.levels.DEBUG)
   
   if callback then
     callback(success and result or nil, success and nil or result)
@@ -36,7 +36,7 @@ function M.is_docker_available()
   vim.notify("[plantuml.nvim] Docker debug: Using Docker command: " .. docker_cmd, vim.log.levels.DEBUG)
   local result, err = run_command(docker_cmd .. " --version")
   local available = result ~= nil and result:match("Docker version")
-  vim.notify("[plantuml.nvim] Docker debug: Docker available: " .. tostring(available) .. (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
+  vim.notify("[plantuml.nvim] Docker debug: Docker available: " .. tostring(available), vim.log.levels.DEBUG)
   return available, err
 end
 
@@ -45,7 +45,7 @@ function M.is_docker_running()
   local docker_cmd = get_docker_cmd()
   local result, err = run_command(docker_cmd .. " info")
   local is_running = result ~= nil and not result:match("Cannot connect to the Docker daemon")
-  vim.notify("[plantuml.nvim] Docker debug: Docker daemon running: " .. tostring(is_running) .. (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
+  vim.notify("[plantuml.nvim] Docker debug: Docker daemon running: " .. tostring(is_running), vim.log.levels.DEBUG)
   return is_running, err
 end
 

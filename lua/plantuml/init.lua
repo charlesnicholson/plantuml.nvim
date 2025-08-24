@@ -317,8 +317,7 @@ local function start_docker_server()
   })
 
   local available, err = docker.is_docker_available()
-  vim.notify("[plantuml.nvim] Docker debug: Docker availability check result: " .. tostring(available) .. 
-             (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
+  vim.notify("[plantuml.nvim] Docker debug: Docker availability check result: " .. tostring(available), vim.log.levels.DEBUG)
   if not available then
     server.broadcast({
       type = "docker_status",
@@ -616,6 +615,11 @@ function M.setup(user_config)
       vim.notify("[plantuml.nvim] Warning: plantuml_server_url is ignored when use_docker is enabled",
         vim.log.levels.WARN)
     end
+  end
+
+  if config.auto_start then
+    vim.notify("[plantuml.nvim] Docker debug: Auto-starting server after setup with final config", vim.log.levels.DEBUG)
+    M.start()
   end
 end
 
