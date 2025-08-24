@@ -20,8 +20,6 @@ jobs:
 
     container:
       image: ghcr.io/charlesnicholson/docker-image:latest
-      options: >-
-        -v /home/runner/work:/home/runner/work
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
