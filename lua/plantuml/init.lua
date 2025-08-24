@@ -15,6 +15,9 @@ local config = vim.deepcopy(default_config)
 assert(pcall(require, "bit"), "[plantuml.nvim] Requires LuaJIT 'bit' library.")
 local bit = require "bit"
 
+local band, bor, bxor, bnot = bit.band, bit.bor, bit.bxor, bit.bnot
+local lshift, rshift, rol, tobit = bit.lshift, bit.rshift, bit.rol, bit.tobit
+
 local LibDeflate = require("plantuml.vendor.LibDeflate.LibDeflate")
 local docker = require("plantuml.docker")
 
@@ -34,23 +37,23 @@ local function encode64_plantuml(data)
   while i <= n do
     local c1, c2, c3 = data:byte(i, i + 2)
     c1 = c1 or 0
-    local b1 = bit.rshift(c1, 2)
+    local b1 = rshift(c1, 2)
     if not c2 then
-      local b2 = bit.band(bit.lshift(c1, 4), 0x3F)
+      local b2 = band(lshift(c1, 4), 0x3F)
       out[#out + 1] = map:sub(b1 + 1, b1 + 1)
       out[#out + 1] = map:sub(b2 + 1, b2 + 1)
       break
     else
-      local b2 = bit.band(bit.bor(bit.lshift(bit.band(c1, 0x3), 4), bit.rshift(c2, 4)), 0x3F)
+      local b2 = band(bor(lshift(band(c1, 0x3), 4), rshift(c2, 4)), 0x3F)
       if not c3 then
-        local b3 = bit.band(bit.lshift(bit.band(c2, 0xF), 2), 0x3F)
+        local b3 = band(lshift(band(c2, 0xF), 2), 0x3F)
         out[#out + 1] = map:sub(b1 + 1, b1 + 1)
         out[#out + 1] = map:sub(b2 + 1, b2 + 1)
         out[#out + 1] = map:sub(b3 + 1, b3 + 1)
         break
       else
-        local b3 = bit.band(bit.bor(bit.lshift(bit.band(c2, 0xF), 2), bit.rshift(c3, 6)), 0x3F)
-        local b4 = bit.band(c3, 0x3F)
+        local b3 = band(bor(lshift(band(c2, 0xF), 2), rshift(c3, 6)), 0x3F)
+        local b4 = band(c3, 0x3F)
         out[#out + 1] = map:sub(b1 + 1, b1 + 1)
         out[#out + 1] = map:sub(b2 + 1, b2 + 1)
         out[#out + 1] = map:sub(b3 + 1, b3 + 1)
@@ -64,9 +67,6 @@ end
 
 local sha1, b64
 do
-  local band, bor, bxor = bit.band, bit.bor, bit.bxor
-  local lshift, rshift, rol, tobit = bit.lshift, bit.rshift, bit.rol, bit.tobit
-
   local function to_be(n)
     return string.char(
       band(rshift(n, 24), 255),
@@ -96,7 +96,7 @@ do
       for j = 0, 79 do
         local f, k
         if j < 20 then
-          f, k = bor(band(b, c), band(bit.bnot(b), d)), 0x5A827999
+          f, k = bor(band(b, c), band(bnot(b), d)), 0x5A827999
         elseif j < 40 then
           f, k = bxor(b, c, d), 0x6ED9EBA1
         elseif j < 60 then
@@ -181,17 +181,17 @@ end
 local function decode_ws_frame(data)
   if #data < 2 then return nil end
   local byte1, byte2 = data:byte(1, 2)
-  local fin = bit.band(byte1, 0x80) ~= 0
-  local opcode = bit.band(byte1, 0x0F)
-  local masked = bit.band(byte2, 0x80) ~= 0
-  local payload_len = bit.band(byte2, 0x7F)
+  local fin = band(byte1, 0x80) ~= 0
+  local opcode = band(byte1, 0x0F)
+  local masked = band(byte2, 0x80) ~= 0
+  local payload_len = band(byte2, 0x7F)
   
   if not fin or opcode ~= 1 then return nil end
   
   local offset = 2
   if payload_len == 126 then
     if #data < 4 then return nil end
-    payload_len = bit.bor(bit.lshift(data:byte(3), 8), data:byte(4))
+    payload_len = bor(lshift(data:byte(3), 8), data:byte(4))
     offset = 4
   elseif payload_len == 127 then
     if #data < 10 then return nil end
@@ -206,7 +206,7 @@ local function decode_ws_frame(data)
     local payload = data:sub(offset + 1, offset + payload_len)
     local decoded = {}
     for i = 1, #payload do
-      decoded[i] = string.char(bit.bxor(payload:byte(i), mask:byte((i - 1) % 4 + 1)))
+      decoded[i] = string.char(bxor(payload:byte(i), mask:byte((i - 1) % 4 + 1)))
     end
     return table.concat(decoded)
   else
