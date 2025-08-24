@@ -191,86 +191,35 @@ local html_content = [[
 
   function isImageAtNaturalSize() {
     if (!img.naturalWidth || !img.naturalHeight) {
-      console.log('isImageAtNaturalSize: false (no natural dimensions)');
       return false;
     }
     const rect = img.getBoundingClientRect();
-    const result = Math.abs(rect.width - img.naturalWidth) < 1 && Math.abs(rect.height - img.naturalHeight) < 1;
-    console.log('isImageAtNaturalSize: natural=' + img.naturalWidth + 'x' + img.naturalHeight + 
-                ', displayed=' + rect.width.toFixed(1) + 'x' + rect.height.toFixed(1) + 
-                ', result=' + result);
-    return result;
+    return Math.abs(rect.width - img.naturalWidth) < 1 && Math.abs(rect.height - img.naturalHeight) < 1;
   }
 
   function doesImageFitVertically() {
     if (!img.naturalWidth || !img.naturalHeight) {
-      console.log('doesImageFitVertically: false (no natural dimensions)');
       return false;
     }
     const boardRect = board.getBoundingClientRect();
-    const result = img.naturalHeight <= boardRect.height;
-    console.log('doesImageFitVertically: image height=' + img.naturalHeight + 
-                ', board height=' + boardRect.height + ', result=' + result);
-    return result;
+    return img.naturalHeight <= boardRect.height;
   }
 
   board.addEventListener('click', () => {
-    console.log('=== CLICK EVENT TRIGGERED ===');
-    console.log('hasLoadedDiagram:', hasLoadedDiagram);
-    console.log('isFitToPage:', isFitToPage);
-    
-    if (img.naturalWidth && img.naturalHeight) {
-      console.log('Image natural dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-      const imgRect = img.getBoundingClientRect();
-      console.log('Image displayed dimensions:', imgRect.width, 'x', imgRect.height);
-      console.log('Image aspect ratio (W/H):', (img.naturalWidth / img.naturalHeight).toFixed(2));
-      console.log('Is landscape (W > H):', img.naturalWidth > img.naturalHeight);
-    } else {
-      console.log('Image natural dimensions: NONE');
-    }
-    
-    const boardRect = board.getBoundingClientRect();
-    console.log('Board dimensions:', boardRect.width, 'x', boardRect.height);
-    
-    const isAtNaturalSize = isImageAtNaturalSize();
-    const fitsVertically = doesImageFitVertically();
-    const isLandscape = img.naturalWidth > img.naturalHeight;
-    
-    console.log('isImageAtNaturalSize():', isAtNaturalSize);
-    console.log('doesImageFitVertically():', fitsVertically);
-    
-    console.log('--- Condition Checks ---');
-    console.log('Condition 1 - !hasLoadedDiagram:', !hasLoadedDiagram);
     if (!hasLoadedDiagram) {
-      console.log('EARLY RETURN: No diagram loaded');
       return;
     }
     
-    const condition2 = isFitToPage && isAtNaturalSize;
-    console.log('Condition 2 - isFitToPage && isImageAtNaturalSize():', condition2);
-    if (condition2) {
-      console.log('EARLY RETURN: Image is at natural size in fit-to-page mode');
+    if (isFitToPage && isImageAtNaturalSize()) {
       return;
     }
     
-    const condition3 = isFitToPage && !isAtNaturalSize && isLandscape;
-    console.log('Condition 3 - isFitToPage && !isImageAtNaturalSize() && img.naturalWidth > img.naturalHeight:', condition3);
-    console.log('  - isFitToPage:', isFitToPage);
-    console.log('  - !isImageAtNaturalSize():', !isAtNaturalSize);
-    console.log('  - doesImageFitVertically():', fitsVertically, '(not used for condition)');
-    console.log('  - img.naturalWidth > img.naturalHeight:', isLandscape);
-    if (condition3) {
-      console.log('EARLY RETURN: Wide minified landscape image - click ignored');
+    if (isFitToPage && !isImageAtNaturalSize() && img.naturalWidth > img.naturalHeight) {
       return;
     }
     
-    console.log('TOGGLE ACTION: Switching fit mode');
-    console.log('Previous isFitToPage:', isFitToPage);
     isFitToPage = !isFitToPage;
-    console.log('New isFitToPage:', isFitToPage);
     board.classList.toggle('fit-to-page', isFitToPage);
-    console.log('Board classes after toggle:', board.className);
-    console.log('=== CLICK EVENT COMPLETE ===');
   });
 
   function wsPort() {
@@ -319,18 +268,6 @@ local html_content = [[
     img.style.opacity = 1;
     hasLoadedDiagram = true;
     setStatus("ok", "Live");
-    console.log('=== IMAGE LOADED ===');
-    console.log('Image natural dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-    console.log('Image aspect ratio (W/H):', (img.naturalWidth / img.naturalHeight).toFixed(2));
-    console.log('Is landscape (W > H):', img.naturalWidth > img.naturalHeight);
-    console.log('hasLoadedDiagram set to:', hasLoadedDiagram);
-    const boardRect = board.getBoundingClientRect();
-    const imgRect = img.getBoundingClientRect();
-    console.log('Board dimensions:', boardRect.width, 'x', boardRect.height);
-    console.log('Image displayed dimensions:', imgRect.width, 'x', imgRect.height);
-    console.log('Initial fit mode (isFitToPage):', isFitToPage);
-    console.log('Board classes:', board.className);
-    console.log('=== IMAGE LOAD COMPLETE ===');
   };
 
   setStatus("warn", "Connecting...");
