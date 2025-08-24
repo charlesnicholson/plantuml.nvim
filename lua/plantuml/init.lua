@@ -304,13 +304,31 @@ local function start_docker_server()
     return true, nil
   end
   
+  server.broadcast({ 
+    type = "docker_status", 
+    operation = "docker_check",
+    status = "Checking Docker availability..."
+  })
+  
   local available, err = docker.is_docker_available()
   if not available then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "docker_check",
+      status = "Docker not available",
+      error = true
+    })
     return false, "[plantuml.nvim] Docker is not available: " .. (err or "unknown error")
   end
   
   local running, err = docker.is_docker_running()
   if not running then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "docker_check",
+      status = "Docker daemon not running",
+      error = true
+    })
     return false, "[plantuml.nvim] Docker daemon is not running: " .. (err or "unknown error")
   end
   
@@ -318,10 +336,25 @@ local function start_docker_server()
   
   if status == "running" then
     vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_reuse",
+      status = "Using existing Docker container"
+    })
   elseif status == "stopped" then
     vim.notify("[plantuml.nvim] Restarting PlantUML Docker container...", vim.log.levels.INFO)
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_start",
+      status = "Restarting Docker container..."
+    })
   else
     vim.notify("[plantuml.nvim] Starting PlantUML Docker container...", vim.log.levels.INFO)
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_start",
+      status = "Starting Docker container..."
+    })
   end
   
   local success, err = docker.start_container(
@@ -332,17 +365,42 @@ local function start_docker_server()
   )
   
   if not success then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_start",
+      status = "Failed to start container",
+      error = true
+    })
     return false, "[plantuml.nvim] Failed to start Docker container: " .. (err or "unknown error")
   end
   
   if status ~= "running" then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_ready",
+      status = "Waiting for container to be ready..."
+    })
+    
     local ready, err = docker.wait_for_container_ready(docker_container_name, 30)
     if not ready then
+      server.broadcast({ 
+        type = "docker_status", 
+        operation = "container_ready",
+        status = "Container failed to be ready",
+        error = true
+      })
       return false, "[plantuml.nvim] Docker container failed to be ready: " .. (err or "timeout")
     end
   end
   
   vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
+  server.broadcast({ 
+    type = "docker_status", 
+    operation = "container_ready",
+    status = "Docker container ready",
+    completed = true
+  })
+  
   return true, nil
 end
 
@@ -351,15 +409,51 @@ local function stop_docker_server()
     return true, nil
   end
   
+  server.broadcast({ 
+    type = "docker_status", 
+    operation = "container_stop",
+    status = "Stopping Docker container..."
+  })
+  
   local success, err = docker.stop_container(docker_container_name)
   if not success then
     vim.notify("[plantuml.nvim] Warning: Failed to stop Docker container: " .. (err or "unknown error"), vim.log.levels.WARN)
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_stop",
+      status = "Failed to stop container",
+      error = true
+    })
+  else
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_stop",
+      status = "Container stopped"
+    })
   end
   
   if config.docker_remove_on_stop then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_remove",
+      status = "Removing Docker container..."
+    })
+    
     local success, err = docker.remove_container(docker_container_name)
     if not success then
       vim.notify("[plantuml.nvim] Warning: Failed to remove Docker container: " .. (err or "unknown error"), vim.log.levels.WARN)
+      server.broadcast({ 
+        type = "docker_status", 
+        operation = "container_remove",
+        status = "Failed to remove container",
+        error = true
+      })
+    else
+      server.broadcast({ 
+        type = "docker_status", 
+        operation = "container_remove",
+        status = "Container removed"
+      })
     end
   end
   
