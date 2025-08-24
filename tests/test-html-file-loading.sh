@@ -4,14 +4,7 @@ set -e
 
 echo "Testing HTML file loading functionality..."
 
-# Create temporary directory  
-TEMP_DIR=$(mktemp -d)
 
-# Cleanup function
-cleanup() {
-    rm -rf "$TEMP_DIR"
-}
-trap cleanup EXIT
 
 # Test 1: Verify HTML file exists
 echo "Test 1: Verify HTML file exists"

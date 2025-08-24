@@ -1,20 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-# Create temporary directory
-TEMP_DIR=$(mktemp -d)
 
-# Cleanup function
-cleanup() {
-    rm -rf "$TEMP_DIR"
-}
-trap cleanup EXIT
 
 echo "Testing PlantUML processing..."
 
 # Initialize all PID variables to avoid unbound variable errors
 NVIM_PID=""
-NVIM_PID2=""
 LISTENER_PID=""
 
 # Create WebSocket listener to capture messages
@@ -168,7 +160,6 @@ cleanup() {
     echo "Cleaning up..."
     # Kill any remaining Neovim processes
     [ -n "$NVIM_PID" ] && kill $NVIM_PID 2>/dev/null || true
-    [ -n "$NVIM_PID2" ] && kill $NVIM_PID2 2>/dev/null || true
     [ -n "$LISTENER_PID" ] && kill $LISTENER_PID 2>/dev/null || true
     pkill -f "nvim.*headless" 2>/dev/null || true
 }

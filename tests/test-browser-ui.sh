@@ -1,14 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Create temporary directory
-TEMP_DIR=$(mktemp -d)
 
-# Cleanup function
-cleanup() {
-    rm -rf "$TEMP_DIR"
-}
-trap cleanup EXIT
 
 echo "Testing browser UI interactions..."
 
