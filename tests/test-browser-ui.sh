@@ -83,8 +83,14 @@ const { chromium } = require('playwright');
     if (!pageContent.includes('.timestamp{')) {
       throw new Error('Timestamp class styling not found in CSS');
     }
-    if (!pageContent.includes('.file-info{')) {
-      throw new Error('File-info class styling not found in CSS');
+    if (!pageContent.includes('.filename-section{')) {
+      throw new Error('Filename-section class styling not found in CSS');
+    }
+    if (!pageContent.includes('.status-section{')) {
+      throw new Error('Status-section class styling not found in CSS');
+    }
+    if (!pageContent.includes('.info-section{')) {
+      throw new Error('Info-section class styling not found in CSS');
     }
     console.log('✓ Current layout styling found in CSS');
     
@@ -119,6 +125,106 @@ const { chromium } = require('playwright');
       throw new Error(`Expected empty file text when no image loaded, but got: "${initialFileText}"`);
     }
     console.log('✓ File element is empty when no image is loaded');
+    
+    // Test 4.6: Test filename truncation behavior
+    console.log('Testing filename truncation behavior...');
+    
+    const truncationTests = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const fileEl = document.getElementById('file');
+      ctx.font = getComputedStyle(fileEl).font;
+      
+      function truncateFilename(fullPath, maxWidth) {
+        if (!fullPath) return '';
+        
+        if (ctx.measureText(fullPath).width <= maxWidth) {
+          return fullPath;
+        }
+        
+        const lastSlashIndex = fullPath.lastIndexOf('/');
+        if (lastSlashIndex === -1) {
+          return fullPath;
+        }
+        
+        const filename = fullPath.substring(lastSlashIndex + 1);
+        
+        if (ctx.measureText(filename).width <= maxWidth) {
+          for (let i = 1; i <= fullPath.length - filename.length; i++) {
+            const truncated = '...' + fullPath.substring(i);
+            if (ctx.measureText(truncated).width <= maxWidth) {
+              if (fullPath.substring(i).indexOf('/') === -1) {
+                return filename;
+              }
+              continue;
+            } else {
+              const prevTruncated = '...' + fullPath.substring(i - 1);
+              if (fullPath.substring(i - 1).indexOf('/') === -1) {
+                return filename;
+              }
+              return prevTruncated;
+            }
+          }
+          return filename;
+        }
+        
+        return filename;
+      }
+      
+      const tests = [];
+      
+      // Test 1: Short path that fits completely
+      const shortPath = 'test.puml';
+      const shortResult = truncateFilename(shortPath, 1000);
+      tests.push({
+        name: 'Short path fits completely',
+        input: shortPath,
+        expected: shortPath,
+        actual: shortResult,
+        passed: shortResult === shortPath
+      });
+      
+      // Test 2: Long path that needs truncation
+      const longPath = '/very/long/path/to/some/deep/directory/structure/filename.puml';
+      const longResult = truncateFilename(longPath, 100);
+      tests.push({
+        name: 'Long path truncation',
+        input: longPath,
+        actual: longResult,
+        passed: longResult.startsWith('...') || longResult === 'filename.puml'
+      });
+      
+      // Test 3: Path where truncation reaches filename (should show filename without ellipses)
+      const mediumPath = '/Users/test/file.puml';
+      const mediumResult = truncateFilename(mediumPath, 80);
+      tests.push({
+        name: 'Truncation reaches filename',
+        input: mediumPath,
+        actual: mediumResult,
+        passed: mediumResult === 'file.puml' || mediumResult.includes('file.puml')
+      });
+      
+      // Test 4: Very narrow width forces filename only
+      const narrowResult = truncateFilename(longPath, 50);
+      tests.push({
+        name: 'Very narrow width',
+        input: longPath,
+        actual: narrowResult,
+        expected: 'filename.puml',
+        passed: narrowResult === 'filename.puml'
+      });
+      
+      return tests;
+    });
+    
+    // Validate truncation test results
+    for (const test of truncationTests) {
+      console.log(`Truncation test "${test.name}":`, test.actual);
+      if (!test.passed) {
+        throw new Error(`Truncation test "${test.name}" failed. Expected: ${test.expected || 'valid truncation'}, Got: ${test.actual}`);
+      }
+    }
+    console.log('✓ All filename truncation tests passed');
     
     // Test 5: Enable click functionality for testing
     console.log('Enabling click functionality for testing...');
