@@ -137,7 +137,7 @@ local function load_html_content()
   
   local current_file = debug.getinfo(1).source:sub(2)
   local plugin_dir = vim.fn.fnamemodify(current_file, ":h")
-  local html_file = plugin_dir .. "/assets/viewer.html"
+  local html_file = vim.fs.joinpath(plugin_dir, "assets", "viewer.html")
   
   local file = io.open(html_file, "r")
   if not file then
