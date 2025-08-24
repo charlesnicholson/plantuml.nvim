@@ -224,3 +224,95 @@ else
 fi
 
 echo "✓ All Docker PlantUML server tests passed"
+
+# Cleanup between tests to ensure clean state for test 4
+cleanup
+
+echo "Test 4: Test container reuse behavior"
+
+# Start a container manually to simulate existing container
+echo "Starting PlantUML container manually..."
+docker run -d --name $CONTAINER_NAME -p $HOST_PORT:$INTERNAL_PORT $DOCKER_IMAGE
+
+# Wait for server to be ready
+echo "Waiting for PlantUML server to be ready..."
+for i in {1..30}; do
+    if curl -s http://localhost:$HOST_PORT/ > /dev/null 2>&1; then
+        echo "✓ PlantUML server is responding"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        echo "✗ PlantUML server failed to start within 30 seconds"
+        exit 1
+    fi
+    sleep 1
+done
+
+# Test that the plugin reuses the existing container
+cat > /tmp/test_container_reuse.lua << 'EOF'
+package.path = package.path .. ";./lua/?.lua;./lua/?/init.lua"
+local docker = require("plantuml.docker")
+
+local container_name = "plantuml-nvim-test"
+local image = "plantuml/plantuml-server:jetty"
+local host_port = 8080
+local internal_port = 8080
+
+-- Check initial status (should be running)
+local status, err = docker.get_container_status(container_name)
+if status ~= "running" then
+    print("Expected initial container status 'running', got: " .. tostring(status))
+    os.exit(1)
+end
+print("✓ Container is initially running")
+
+-- Get initial container ID to verify it's the same container after start_container
+local docker_cmd = (vim.fn.has('win32') == 1 or vim.fn.has('win64') == 1) and "docker.exe" or "docker"
+local cmd = string.format('%s ps --filter "name=%s" --format "{{.ID}}"', docker_cmd, container_name)
+local handle = io.popen(cmd)
+local initial_id = handle:read("*all"):gsub("%s+$", "")
+handle:close()
+
+if initial_id == "" then
+    print("Failed to get initial container ID")
+    os.exit(1)
+end
+print("✓ Initial container ID: " .. initial_id)
+
+-- Try to start the container (should reuse existing)
+local success, err = docker.start_container(container_name, image, host_port, internal_port)
+if not success then
+    print("Failed to start/reuse container: " .. (err or "unknown error"))
+    os.exit(1)
+end
+
+-- Check that it's still the same container
+local handle = io.popen(cmd)
+local final_id = handle:read("*all"):gsub("%s+$", "")
+handle:close()
+
+if final_id ~= initial_id then
+    print("Container ID changed - new container was created instead of reused")
+    print("Initial ID: " .. initial_id)
+    print("Final ID: " .. final_id)
+    os.exit(1)
+end
+print("✓ Same container was reused (ID: " .. final_id .. ")")
+
+-- Verify container is still running and responding
+local status, err = docker.get_container_status(container_name)
+if status ~= "running" then
+    print("Expected final container status 'running', got: " .. tostring(status))
+    os.exit(1)
+end
+print("✓ Container is still running after reuse")
+
+print("All container reuse tests passed")
+EOF
+
+nvim --headless --clean \
+    -u ~/.config/nvim/init.lua \
+    -c "luafile /tmp/test_container_reuse.lua" \
+    -c "qall!" 2>&1
+
+echo "✓ Container reuse tests passed"

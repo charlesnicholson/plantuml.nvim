@@ -314,7 +314,15 @@ local function start_docker_server()
     return false, "[plantuml.nvim] Docker daemon is not running: " .. (err or "unknown error")
   end
   
-  vim.notify("[plantuml.nvim] Starting PlantUML Docker container...", vim.log.levels.INFO)
+  local status, _ = docker.get_container_status(docker_container_name)
+  
+  if status == "running" then
+    vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
+  elseif status == "stopped" then
+    vim.notify("[plantuml.nvim] Restarting PlantUML Docker container...", vim.log.levels.INFO)
+  else
+    vim.notify("[plantuml.nvim] Starting PlantUML Docker container...", vim.log.levels.INFO)
+  end
   
   local success, err = docker.start_container(
     docker_container_name, 
@@ -327,9 +335,11 @@ local function start_docker_server()
     return false, "[plantuml.nvim] Failed to start Docker container: " .. (err or "unknown error")
   end
   
-  local ready, err = docker.wait_for_container_ready(docker_container_name, 30)
-  if not ready then
-    return false, "[plantuml.nvim] Docker container failed to be ready: " .. (err or "timeout")
+  if status ~= "running" then
+    local ready, err = docker.wait_for_container_ready(docker_container_name, 30)
+    if not ready then
+      return false, "[plantuml.nvim] Docker container failed to be ready: " .. (err or "timeout")
+    end
   end
   
   vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
