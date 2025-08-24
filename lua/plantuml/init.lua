@@ -301,14 +301,8 @@ end
 
 local function start_docker_server(callback)
   if not config.use_docker then
-    vim.notify("[plantuml.nvim] Docker debug: Docker not enabled in config", vim.log.levels.DEBUG)
     if callback then callback(true, nil) else return true, nil end
   end
-
-  vim.notify("[plantuml.nvim] Docker debug: Starting Docker server with config: " .. 
-             "image=" .. config.docker_image .. 
-             ", port=" .. config.docker_port .. 
-             ", remove_on_stop=" .. tostring(config.docker_remove_on_stop), vim.log.levels.DEBUG)
 
   server.broadcast({
     type = "docker_status",
@@ -318,7 +312,6 @@ local function start_docker_server(callback)
 
   if callback then
     docker.is_docker_available(function(available, err)
-      vim.notify("[plantuml.nvim] Docker debug: Docker availability check result: " .. tostring(available), vim.log.levels.DEBUG)
       if not available then
         server.broadcast({
           type = "docker_status",
@@ -331,8 +324,6 @@ local function start_docker_server(callback)
       end
 
       docker.is_docker_running(function(running, err)
-        vim.notify("[plantuml.nvim] Docker debug: Docker daemon running check result: " .. tostring(running) .. 
-                   (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
         if not running then
           server.broadcast({
             type = "docker_status",
@@ -344,10 +335,7 @@ local function start_docker_server(callback)
           return
         end
 
-        vim.notify("[plantuml.nvim] Docker debug: Checking container status for: " .. docker_container_name, vim.log.levels.DEBUG)
         docker.get_container_status(docker_container_name, function(status, _)
-          vim.notify("[plantuml.nvim] Docker debug: Container status result: " .. status, vim.log.levels.DEBUG)
-
           if status == "running" then
             vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
             server.broadcast({
@@ -373,21 +361,12 @@ local function start_docker_server(callback)
             })
           end
 
-          vim.notify("[plantuml.nvim] Docker debug: Calling docker.start_container with params: " ..
-                     "container_name=" .. docker_container_name .. 
-                     ", image=" .. config.docker_image .. 
-                     ", host_port=" .. config.docker_port .. 
-                     ", internal_port=8080", vim.log.levels.DEBUG)
-
           docker.start_container(
             docker_container_name,
             config.docker_image,
             config.docker_port,
             8080,
             function(success, err)
-              vim.notify("[plantuml.nvim] Docker debug: docker.start_container result: " .. tostring(success) .. 
-                         (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
-
               if not success then
                 server.broadcast({
                   type = "docker_status",
@@ -400,7 +379,6 @@ local function start_docker_server(callback)
               end
 
               if status ~= "running" then
-                vim.notify("[plantuml.nvim] Docker debug: Container was not running, waiting for it to be ready", vim.log.levels.DEBUG)
                 server.broadcast({
                   type = "docker_status",
                   operation = "container_ready",
@@ -408,8 +386,6 @@ local function start_docker_server(callback)
                 })
 
                 docker.wait_for_container_ready(docker_container_name, 30, function(ready, err)
-                  vim.notify("[plantuml.nvim] Docker debug: wait_for_container_ready result: " .. tostring(ready) .. 
-                             (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
                   if not ready then
                     server.broadcast({
                       type = "docker_status",
@@ -449,7 +425,6 @@ local function start_docker_server(callback)
     end)
   else
     local available, err = docker.is_docker_available()
-    vim.notify("[plantuml.nvim] Docker debug: Docker availability check result: " .. tostring(available), vim.log.levels.DEBUG)
     if not available then
       server.broadcast({
         type = "docker_status",
@@ -461,8 +436,6 @@ local function start_docker_server(callback)
     end
 
     local running, err = docker.is_docker_running()
-    vim.notify("[plantuml.nvim] Docker debug: Docker daemon running check result: " .. tostring(running) .. 
-               (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
     if not running then
       server.broadcast({
         type = "docker_status",
@@ -473,9 +446,7 @@ local function start_docker_server(callback)
       return false, "[plantuml.nvim] Docker daemon is not running: " .. (err or "unknown error")
     end
 
-    vim.notify("[plantuml.nvim] Docker debug: Checking container status for: " .. docker_container_name, vim.log.levels.DEBUG)
     local status, _ = docker.get_container_status(docker_container_name)
-    vim.notify("[plantuml.nvim] Docker debug: Container status result: " .. status, vim.log.levels.DEBUG)
 
     if status == "running" then
       vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
@@ -500,21 +471,12 @@ local function start_docker_server(callback)
       })
     end
 
-    vim.notify("[plantuml.nvim] Docker debug: Calling docker.start_container with params: " ..
-               "container_name=" .. docker_container_name .. 
-               ", image=" .. config.docker_image .. 
-               ", host_port=" .. config.docker_port .. 
-               ", internal_port=8080", vim.log.levels.DEBUG)
-
     local success, err = docker.start_container(
       docker_container_name,
       config.docker_image,
       config.docker_port,
       8080
     )
-
-    vim.notify("[plantuml.nvim] Docker debug: docker.start_container result: " .. tostring(success) .. 
-               (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
 
     if not success then
       server.broadcast({
@@ -527,7 +489,6 @@ local function start_docker_server(callback)
     end
 
     if status ~= "running" then
-      vim.notify("[plantuml.nvim] Docker debug: Container was not running, waiting for it to be ready", vim.log.levels.DEBUG)
       server.broadcast({
         type = "docker_status",
         operation = "container_ready",
@@ -535,8 +496,6 @@ local function start_docker_server(callback)
       })
 
       local ready, err = docker.wait_for_container_ready(docker_container_name, 30)
-      vim.notify("[plantuml.nvim] Docker debug: wait_for_container_ready result: " .. tostring(ready) .. 
-                 (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
       if not ready then
         server.broadcast({
           type = "docker_status",
@@ -562,11 +521,8 @@ end
 
 local function stop_docker_server()
   if not config.use_docker then
-    vim.notify("[plantuml.nvim] Docker debug: Docker not enabled, skipping stop", vim.log.levels.DEBUG)
     return true, nil
   end
-
-  vim.notify("[plantuml.nvim] Docker debug: Stopping Docker server", vim.log.levels.DEBUG)
 
   server.broadcast({
     type = "docker_status",
@@ -575,8 +531,6 @@ local function stop_docker_server()
   })
 
   local success, err = docker.stop_container(docker_container_name)
-  vim.notify("[plantuml.nvim] Docker debug: stop_container result: " .. tostring(success) .. 
-             (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
   if not success then
     vim.notify("[plantuml.nvim] Warning: Failed to stop Docker container: " .. (err or "unknown error"),
       vim.log.levels.WARN)
@@ -673,12 +627,8 @@ function M.update_diagram()
 end
 
 function M.start()
-  vim.notify("[plantuml.nvim] Docker debug: Starting server with Docker config: use_docker=" .. tostring(config.use_docker), vim.log.levels.DEBUG)
   if config.use_docker then
-    vim.notify("[plantuml.nvim] Docker debug: About to start Docker server", vim.log.levels.DEBUG)
     start_docker_server(function(success, err)
-      vim.notify("[plantuml.nvim] Docker debug: start_docker_server completed: " .. tostring(success) .. 
-                 (err and (" (error: " .. err .. ")") or ""), vim.log.levels.DEBUG)
       if not success then
         vim.notify(err, vim.log.levels.ERROR)
         return
@@ -728,7 +678,6 @@ function M.stop()
   end
 
   if config.use_docker then
-    vim.notify("[plantuml.nvim] Docker debug: About to stop Docker server", vim.log.levels.DEBUG)
     stop_docker_server()
   end
 
@@ -740,13 +689,6 @@ function M.setup(user_config)
     config = vim.tbl_deep_extend("force", default_config, user_config)
   end
 
-  vim.notify("[plantuml.nvim] Docker debug: Setup completed with config: " .. 
-             "use_docker=" .. tostring(config.use_docker) .. 
-             ", docker_image=" .. config.docker_image .. 
-             ", docker_port=" .. config.docker_port .. 
-             ", docker_remove_on_stop=" .. tostring(config.docker_remove_on_stop) .. 
-             ", auto_start=" .. tostring(config.auto_start), vim.log.levels.DEBUG)
-
   if config.use_docker then
     if config.plantuml_server_url ~= default_config.plantuml_server_url then
       vim.notify("[plantuml.nvim] Warning: plantuml_server_url is ignored when use_docker is enabled",
@@ -755,7 +697,6 @@ function M.setup(user_config)
   end
 
   if config.auto_start then
-    vim.notify("[plantuml.nvim] Docker debug: Auto-starting server after setup with final config", vim.log.levels.DEBUG)
     M.start()
   end
 end
