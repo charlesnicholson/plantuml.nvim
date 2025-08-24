@@ -3,8 +3,9 @@ set -euo pipefail
 
 echo "Setting up test environment..."
 
-# Create logs and screenshots directories
-mkdir -p tests/logs tests/screenshots
+# Only create screenshots directory (for actual screenshot output)
+# Log directories are now created by individual test scripts as temporary directories
+mkdir -p tests/screenshots
 
 # Create Neovim config directory for testing
 mkdir -p ~/.config/nvim

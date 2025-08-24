@@ -1,10 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_FILE="tests/logs/browser-ui.log"
+# Create temporary directory and log file
+TEMP_DIR=$(mktemp -d)
+LOG_FILE="$TEMP_DIR/browser-ui.log"
+
+# Cleanup function
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
+
 echo "Testing browser UI interactions..." | tee "$LOG_FILE"
 
-# Create screenshots directory if it doesn't exist
+# Create screenshots directory if it doesn't exist (this is needed for actual screenshots)
 mkdir -p tests/screenshots
 
 # Check if Playwright is available

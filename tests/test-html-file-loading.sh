@@ -4,10 +4,16 @@ set -e
 
 echo "Testing HTML file loading functionality..."
 
-# Create test directory and log file
-mkdir -p tests/logs
-LOG_FILE="tests/logs/test-html-file-loading.log"
+# Create temporary directory and log file
+TEMP_DIR=$(mktemp -d)
+LOG_FILE="$TEMP_DIR/test-html-file-loading.log"
 echo "Starting HTML file loading tests..." > "$LOG_FILE"
+
+# Cleanup function
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
 
 # Test 1: Verify HTML file exists
 echo "Test 1: Verify HTML file exists" | tee -a "$LOG_FILE"

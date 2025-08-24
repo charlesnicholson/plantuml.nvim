@@ -1,7 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_FILE="tests/logs/plantuml-processing.log"
+# Create temporary directory and log file
+TEMP_DIR=$(mktemp -d)
+LOG_FILE="$TEMP_DIR/plantuml-processing.log"
+
+# Cleanup function
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
+
 echo "Testing PlantUML processing..." | tee "$LOG_FILE"
 
 # Initialize all PID variables to avoid unbound variable errors

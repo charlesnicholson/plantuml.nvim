@@ -1,7 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_FILE="tests/logs/auto-update-config.log"
+# Create temporary directory and log file
+TEMP_DIR=$(mktemp -d)
+LOG_FILE="$TEMP_DIR/auto-update-config.log"
+
+# Cleanup function
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
+
 echo "Testing auto_update configuration option..." | tee "$LOG_FILE"
 
 # Test 1: Default configuration has auto_update = true

@@ -1,11 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_FILE="tests/logs/vim-help-system.log"
-echo "Testing vim help system integration..." | tee "$LOG_FILE"
+# Create temporary directory and log file
+TEMP_DIR=$(mktemp -d)
+LOG_FILE="$TEMP_DIR/vim-help-system.log"
 
-# Ensure log directory exists
-mkdir -p tests/logs
+# Cleanup function
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
+
+echo "Testing vim help system integration..." | tee "$LOG_FILE"
 
 # Test 1: Help tags file was generated
 echo "Test 1: Help tags file was generated" | tee -a "$LOG_FILE"

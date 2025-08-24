@@ -1,7 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_FILE="tests/logs/http-server.log"
+# Create temporary directory and log file
+TEMP_DIR=$(mktemp -d)
+LOG_FILE="$TEMP_DIR/http-server.log"
+
+# Cleanup function
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
+
 echo "Testing HTTP server..." | tee "$LOG_FILE"
 
 # Start Neovim with plugin in background
