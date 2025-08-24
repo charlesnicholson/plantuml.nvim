@@ -33,6 +33,18 @@ The browser page shows a live status indicator and automatically refreshes diagr
 }
 ```
 
+### Lazy (with Docker PlantUML server)
+```lua
+{
+  "charlesnicholson/plantuml.nvim",
+  opts = {
+    use_docker = true,
+    docker_port = 8080,
+    docker_remove_on_stop = true,
+  }
+}
+```
+
 ### Manual setup
 ```lua
 require("plantuml").setup({
@@ -41,6 +53,16 @@ require("plantuml").setup({
   http_port = 9000,    -- Use different port
   plantuml_server_url = "http://my-plantuml-server.com/plantuml",
   auto_launch_browser = "always",  -- Always automatically launch browser
+})
+```
+
+### Docker PlantUML server setup
+```lua
+require("plantuml").setup({
+  use_docker = true,                    -- Enable Docker PlantUML server
+  docker_image = "plantuml/plantuml-server:jetty",  -- Docker image
+  docker_port = 8080,                   -- Host port for container
+  docker_remove_on_stop = false,        -- Keep container after stopping
 })
 ```
 
@@ -56,6 +78,21 @@ The plugin supports the following configuration options:
   - `"never"` - Never automatically launch a browser
   - `"always"` - Always launch a browser if no clients are connected when a file is opened/saved/etc
   - `"once"` - Only launch a browser once per Neovim session when a file is opened/saved/etc
+
+### Docker PlantUML Server
+
+The plugin can run a local PlantUML server in Docker instead of using the external plantuml.com service:
+
+- `use_docker` (boolean, default: `false`) - Enable Docker PlantUML server (mutually exclusive with `plantuml_server_url`)
+- `docker_image` (string, default: `"plantuml/plantuml-server:jetty"`) - Docker image to use for PlantUML server
+- `docker_port` (number, default: `8080`) - Host port to bind the Docker container
+- `docker_remove_on_stop` (boolean, default: `false`) - Whether to remove the container when stopping the server
+
+Docker mode provides:
+- Local PlantUML rendering without external dependencies
+- Automatic container lifecycle management (start, stop, reattach)
+- Cross-platform support (Windows, Linux, macOS)
+- No external network requests for diagram generation
 
 ## Commands
 
