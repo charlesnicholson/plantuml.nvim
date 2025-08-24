@@ -53,6 +53,15 @@ Manual setup: >
     })
 <
 
+Docker setup: >
+    require("plantuml").setup({
+      use_docker = true,
+      docker_image = "plantuml/plantuml-server:jetty",
+      docker_port = 8080,
+      docker_remove_on_stop = true,
+    })
+<
+
 ==============================================================================
 3. CONFIGURATION					*plantuml-configuration*
 
@@ -95,6 +104,32 @@ auto_launch_browser~
 	- `"once"` - Only launch a browser once per Neovim session when a
 	  PlantUML file is opened/saved/etc
 
+*g:plantuml_use_docker*
+use_docker~
+	Type: boolean
+	Default: `false`
+	Enable Docker PlantUML server instead of external plantuml.com
+	service. Mutually exclusive with `plantuml_server_url`.
+
+*g:plantuml_docker_image*
+docker_image~
+	Type: string
+	Default: `"plantuml/plantuml-server:jetty"`
+	Docker image to use for the local PlantUML server.
+
+*g:plantuml_docker_port*
+docker_port~
+	Type: number
+	Default: `8080`
+	Host port to bind the Docker container running PlantUML server.
+
+*g:plantuml_docker_remove_on_stop*
+docker_remove_on_stop~
+	Type: boolean
+	Default: `false`
+	Whether to remove the Docker container when stopping the server.
+	If `false`, the container is stopped but preserved for reuse.
+
 ==============================================================================
 4. COMMANDS						*plantuml-commands*
 
@@ -129,6 +164,19 @@ in Neovim.
 When `auto_update` is `true` (default), diagrams update automatically when
 you save, open, or enter a buffer with a `.puml` file extension. Use
 |:PlantumlUpdate| for manual refreshes or when automatic updates are disabled.
+
+Docker PlantUML Server:
+
+When `use_docker` is enabled, the plugin automatically manages a local Docker
+container running PlantUML server. This provides:
+- Local diagram rendering without external network dependencies
+- Automatic container lifecycle management (start, stop, reattach to existing)
+- Cross-platform Docker support (Windows, Linux, macOS)
+- Configurable container image and port binding
+
+The plugin will reattach to existing running containers on startup and start
+new containers as needed. Container removal behavior is controlled by the
+`docker_remove_on_stop` option.
 
 Examples:
 

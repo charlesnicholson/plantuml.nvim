@@ -4,6 +4,10 @@ local default_config = {
   http_port = 8764,
   plantuml_server_url = "http://www.plantuml.com/plantuml",
   auto_launch_browser = "never",
+  use_docker = false,
+  docker_image = "plantuml/plantuml-server:jetty",
+  docker_port = 8080,
+  docker_remove_on_stop = false,
 }
 
 local config = vim.deepcopy(default_config)
@@ -12,6 +16,7 @@ assert(pcall(require, "bit"), "[plantuml.nvim] Requires LuaJIT 'bit' library.")
 local bit = require "bit"
 
 local LibDeflate = require("plantuml.vendor.LibDeflate.LibDeflate")
+local docker = require("plantuml.docker")
 
 local zlib = {}
 function zlib.deflate(buf)
@@ -156,6 +161,7 @@ local browser_launched_this_session = false
 local last_message = nil
 local http_server = nil
 local ws_server = nil
+local docker_container_name = "plantuml-nvim"
 
 local function encode_ws_frame(payload)
   local len = #payload
@@ -293,6 +299,175 @@ function server.start()
   end)
 end
 
+local function start_docker_server()
+  if not config.use_docker then
+    return true, nil
+  end
+  
+  server.broadcast({ 
+    type = "docker_status", 
+    operation = "docker_check",
+    status = "Checking Docker availability..."
+  })
+  
+  local available, err = docker.is_docker_available()
+  if not available then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "docker_check",
+      status = "Docker not available",
+      error = true
+    })
+    return false, "[plantuml.nvim] Docker is not available: " .. (err or "unknown error")
+  end
+  
+  local running, err = docker.is_docker_running()
+  if not running then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "docker_check",
+      status = "Docker daemon not running",
+      error = true
+    })
+    return false, "[plantuml.nvim] Docker daemon is not running: " .. (err or "unknown error")
+  end
+  
+  local status, _ = docker.get_container_status(docker_container_name)
+  
+  if status == "running" then
+    vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_reuse",
+      status = "Using existing Docker container"
+    })
+  elseif status == "stopped" then
+    vim.notify("[plantuml.nvim] Restarting PlantUML Docker container...", vim.log.levels.INFO)
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_start",
+      status = "Restarting Docker container..."
+    })
+  else
+    vim.notify("[plantuml.nvim] Starting PlantUML Docker container...", vim.log.levels.INFO)
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_start",
+      status = "Starting Docker container..."
+    })
+  end
+  
+  local success, err = docker.start_container(
+    docker_container_name, 
+    config.docker_image, 
+    config.docker_port, 
+    8080
+  )
+  
+  if not success then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_start",
+      status = "Failed to start container",
+      error = true
+    })
+    return false, "[plantuml.nvim] Failed to start Docker container: " .. (err or "unknown error")
+  end
+  
+  if status ~= "running" then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_ready",
+      status = "Waiting for container to be ready..."
+    })
+    
+    local ready, err = docker.wait_for_container_ready(docker_container_name, 30)
+    if not ready then
+      server.broadcast({ 
+        type = "docker_status", 
+        operation = "container_ready",
+        status = "Container failed to be ready",
+        error = true
+      })
+      return false, "[plantuml.nvim] Docker container failed to be ready: " .. (err or "timeout")
+    end
+  end
+  
+  vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
+  server.broadcast({ 
+    type = "docker_status", 
+    operation = "container_ready",
+    status = "Docker container ready",
+    completed = true
+  })
+  
+  return true, nil
+end
+
+local function stop_docker_server()
+  if not config.use_docker then
+    return true, nil
+  end
+  
+  server.broadcast({ 
+    type = "docker_status", 
+    operation = "container_stop",
+    status = "Stopping Docker container..."
+  })
+  
+  local success, err = docker.stop_container(docker_container_name)
+  if not success then
+    vim.notify("[plantuml.nvim] Warning: Failed to stop Docker container: " .. (err or "unknown error"), vim.log.levels.WARN)
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_stop",
+      status = "Failed to stop container",
+      error = true
+    })
+  else
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_stop",
+      status = "Container stopped"
+    })
+  end
+  
+  if config.docker_remove_on_stop then
+    server.broadcast({ 
+      type = "docker_status", 
+      operation = "container_remove",
+      status = "Removing Docker container..."
+    })
+    
+    local success, err = docker.remove_container(docker_container_name)
+    if not success then
+      vim.notify("[plantuml.nvim] Warning: Failed to remove Docker container: " .. (err or "unknown error"), vim.log.levels.WARN)
+      server.broadcast({ 
+        type = "docker_status", 
+        operation = "container_remove",
+        status = "Failed to remove container",
+        error = true
+      })
+    else
+      server.broadcast({ 
+        type = "docker_status", 
+        operation = "container_remove",
+        status = "Container removed"
+      })
+    end
+  end
+  
+  return true, nil
+end
+
+local function get_plantuml_server_url()
+  if config.use_docker then
+    return "http://localhost:" .. config.docker_port
+  else
+    return config.plantuml_server_url
+  end
+end
+
 local M = {}
 
 function M.update_diagram()
@@ -307,14 +482,14 @@ function M.update_diagram()
 
   local compressed_data = zlib.deflate(buffer_content)
   local encoded_data = encode64_plantuml(compressed_data)
-  local plantuml_url = config.plantuml_server_url .. "/png/~1" .. encoded_data
+  local server_url = get_plantuml_server_url()
+  local plantuml_url = server_url .. "/png/~1" .. encoded_data
 
   if #plantuml_url > 8000 then
     vim.notify("PlantUML: Resulting URL is very long and may be rejected by the server.", vim.log.levels.WARN)
   end
 
   local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-  local server_url = config.plantuml_server_url
 
   server.broadcast({ 
     type = "update", 
@@ -335,7 +510,15 @@ function M.update_diagram()
 end
 
 function M.start()
+  if config.use_docker then
+    local success, err = start_docker_server()
+    if not success then
+      vim.notify(err, vim.log.levels.ERROR)
+      return false
+    end
+  end
   server.start()
+  return true
 end
 
 function M.is_running()
@@ -373,12 +556,22 @@ function M.stop()
     ws_server:close()
   end
   
+  if config.use_docker then
+    stop_docker_server()
+  end
+  
   vim.notify("[plantuml.nvim] Server stopped.", vim.log.levels.INFO)
 end
 
 function M.setup(user_config)
   if user_config then
     config = vim.tbl_deep_extend("force", default_config, user_config)
+  end
+  
+  if config.use_docker then
+    if config.plantuml_server_url ~= default_config.plantuml_server_url then
+      vim.notify("[plantuml.nvim] Warning: plantuml_server_url is ignored when use_docker is enabled", vim.log.levels.WARN)
+    end
   end
 end
 
