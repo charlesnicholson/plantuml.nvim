@@ -1,11 +1,11 @@
 # GitHub Copilot Development Environment Setup
-# 
+#
 # This workflow provides common setup steps using a pre-built Docker container
 # to help GitHub Copilot agents set up development environments for testing
 # plantuml.nvim before committing changes.
 #
 # Usage in workflows:
-#   - name: Setup development environment  
+#   - name: Setup development environment
 #     uses: ./.github/workflows/copilot-setup-steps.yml
 
 name: Setup PlantUML.nvim Development Environment
@@ -17,34 +17,31 @@ jobs:
   copilot-setup-steps:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     container:
       image: ghcr.io/charlesnicholson/docker-image:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-        
-    - name: Install Node.js dependencies
-      run: |
-        npm install
-        
+
     - name: Install Playwright
       run: |
+        npm install
         npx playwright install chromium --with-deps
-        
+
     - name: Setup test environment
       run: ./tests/setup-test-env.sh
-        
+
     - name: Start virtual display for browser tests
       run: |
         export DISPLAY=:99
         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
         echo "DISPLAY=:99" >> $GITHUB_ENV
-        
+
     - name: Verify setup is complete
       run: |
         echo "Development environment setup complete!"
@@ -58,7 +55,7 @@ jobs:
         echo ""
         echo "You can now run individual test scripts:"
         echo "- ./tests/test-plugin-loading.sh"
-        echo "- ./tests/test-http-server.sh" 
+        echo "- ./tests/test-http-server.sh"
         echo "- ./tests/test-websocket.sh"
         echo "- ./tests/test-plantuml-processing.sh"
         echo "- ./tests/test-browser-ui.sh"
