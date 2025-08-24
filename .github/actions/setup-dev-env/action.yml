@@ -11,6 +11,10 @@ inputs:
     description: 'Skip virtual display setup (for non-browser testing)'
     required: false
     default: 'false'
+  skip-docker:
+    description: 'Skip Docker setup (for non-Docker testing)'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -55,6 +59,10 @@ runs:
           echo "No package.json found, skipping npm install"
         fi
         
+    - name: Setup Docker
+      if: inputs.skip-docker != 'true'
+      uses: docker/setup-docker-action@v3
+      
     - name: Install Playwright
       if: inputs.skip-playwright != 'true'
       shell: bash
@@ -91,6 +99,9 @@ runs:
         fi
         if [ "${{ inputs.skip-virtual-display }}" != "true" ]; then
           echo "- Display: ${DISPLAY:-'Not set'}"
+        fi
+        if [ "${{ inputs.skip-docker }}" != "true" ]; then
+          echo "- Docker: $(docker --version 2>/dev/null || echo 'Not installed')"
         fi
         echo ""
         echo "Available test scripts:"

@@ -4,6 +4,10 @@ local default_config = {
   http_port = 8764,
   plantuml_server_url = "http://www.plantuml.com/plantuml",
   auto_launch_browser = "never",
+  use_docker = false,
+  docker_image = "plantuml/plantuml-server:jetty",
+  docker_port = 8080,
+  docker_remove_on_stop = false,
 }
 
 local config = vim.deepcopy(default_config)

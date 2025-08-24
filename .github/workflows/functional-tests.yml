@@ -15,6 +15,9 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Setup Docker
+      uses: docker/setup-docker-action@v3
+      
     - name: Install system dependencies
       run: |
         sudo apt-get update
