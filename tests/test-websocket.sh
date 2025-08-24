@@ -1,9 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Create temporary directory and log file
+# Create temporary directory
 TEMP_DIR=$(mktemp -d)
-LOG_FILE="$TEMP_DIR/websocket.log"
 
 # Cleanup function
 cleanup() {
@@ -11,24 +10,24 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Testing WebSocket server..." | tee "$LOG_FILE"
+echo "Testing WebSocket server..."
 
 # Start Neovim with plugin in background
-echo "Starting Neovim with plugin..." | tee -a "$LOG_FILE"
+echo "Starting Neovim with plugin..."
 nvim --headless -u ~/.config/nvim/init.lua -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" &
 NVIM_PID=$!
-echo "Neovim started with PID: $NVIM_PID" | tee -a "$LOG_FILE"
+echo "Neovim started with PID: $NVIM_PID"
 
 # Verify both servers are running before proceeding
-echo "Verifying servers are ready..." | tee -a "$LOG_FILE"
+echo "Verifying servers are ready..."
 for i in {1..10}; do
     if netstat -ln | grep ":8764" && netstat -ln | grep ":8765"; then
-        echo "Both servers are listening" | tee -a "$LOG_FILE"
+        echo "Both servers are listening"
         break
     fi
     if [ $i -eq 10 ]; then
-        echo "Servers not ready after 10 seconds" | tee -a "$LOG_FILE"
-        netstat -ln | grep ":876" | tee -a "$LOG_FILE" || true
+        echo "Servers not ready after 10 seconds"
+        netstat -ln | grep ":876" || true
         exit 1
     fi
     # Shorter sleep interval for faster detection
@@ -37,7 +36,7 @@ done
 
 # Cleanup function
 cleanup() {
-    echo "Cleaning up..." | tee -a "$LOG_FILE"
+    echo "Cleaning up..."
     # Skip graceful shutdown for speed - just force kill
     kill $NVIM_PID 2>/dev/null || true
     wait $NVIM_PID 2>/dev/null || true
@@ -119,23 +118,23 @@ testWebSocket().then(results => {
 EOF
 
 # Test 1: WebSocket server is listening on port 8765
-echo "Test 1: WebSocket server is listening on port 8765" | tee -a "$LOG_FILE"
+echo "Test 1: WebSocket server is listening on port 8765"
 if netstat -ln | grep ":8765"; then
-    echo "✓ WebSocket server listening on port 8765" | tee -a "$LOG_FILE"
+    echo "✓ WebSocket server listening on port 8765"
 else
-    echo "✗ WebSocket server not listening on port 8765" | tee -a "$LOG_FILE"
+    echo "✗ WebSocket server not listening on port 8765"
     # Try to get more info
-    netstat -ln | grep ":876" | tee -a "$LOG_FILE" || true
+    netstat -ln | grep ":876" || true
     exit 1
 fi
 
 # Test 2: WebSocket connection and handshake
-echo "Test 2: WebSocket connection and handshake" | tee -a "$LOG_FILE"
-if node /tmp/websocket_test.js 2>&1 | tee -a "$LOG_FILE"; then
-    echo "✓ WebSocket connection and handshake successful" | tee -a "$LOG_FILE"
+echo "Test 2: WebSocket connection and handshake"
+if node /tmp/websocket_test.js 2>&1; then
+    echo "✓ WebSocket connection and handshake successful"
 else
-    echo "✗ WebSocket connection or handshake failed" | tee -a "$LOG_FILE"
+    echo "✗ WebSocket connection or handshake failed"
     exit 1
 fi
 
-echo "✓ All WebSocket tests passed" | tee -a "$LOG_FILE"
+echo "✓ All WebSocket tests passed"

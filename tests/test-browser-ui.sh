@@ -1,9 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Create temporary directory and log file
+# Create temporary directory
 TEMP_DIR=$(mktemp -d)
-LOG_FILE="$TEMP_DIR/browser-ui.log"
 
 # Cleanup function
 cleanup() {
@@ -11,14 +10,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Testing browser UI interactions..." | tee "$LOG_FILE"
+echo "Testing browser UI interactions..."
 
 # Create screenshots directory if it doesn't exist (this is needed for actual screenshots)
 mkdir -p tests/screenshots
 
 # Check if Playwright is available
 if ! command -v npx &> /dev/null || ! npx playwright --version &> /dev/null; then
-    echo "⚠ Playwright not available, skipping browser UI tests" | tee -a "$LOG_FILE"
+    echo "⚠ Playwright not available, skipping browser UI tests"
     exit 0
 fi
 
@@ -367,24 +366,24 @@ const { chromium } = require('playwright');
 EOF
 
 # Start Neovim with plugin in background
-echo "Starting Neovim with plugin..." | tee -a "$LOG_FILE"
+echo "Starting Neovim with plugin..."
 nvim --headless -u ~/.config/nvim/init.lua -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" &
 NVIM_PID=$!
 
 # Wait for server to be ready
-echo "Waiting for server to be ready..." | tee -a "$LOG_FILE"
+echo "Waiting for server to be ready..."
 for i in {1..10}; do
     if netstat -tuln 2>/dev/null | grep -q "127.0.0.1:8764"; then
-        echo "HTTP server is listening" | tee -a "$LOG_FILE"
+        echo "HTTP server is listening"
         break
     fi
-    echo "Waiting for HTTP server to start (attempt $i/10)..." | tee -a "$LOG_FILE"
+    echo "Waiting for HTTP server to start (attempt $i/10)..."
     sleep 1
 done
 
 # Cleanup function
 cleanup() {
-    echo "Cleaning up..." | tee -a "$LOG_FILE"
+    echo "Cleaning up..."
     rm -f browser_test.js  # Clean up the test script
     kill $NVIM_PID 2>/dev/null || true
     wait $NVIM_PID 2>/dev/null || true
@@ -392,19 +391,19 @@ cleanup() {
 trap cleanup EXIT
 
 # Verify HTTP server is running first
-echo "Verifying HTTP server is running..." | tee -a "$LOG_FILE"
+echo "Verifying HTTP server is running..."
 if ! curl -f -s "http://127.0.0.1:8764" > /dev/null; then
-    echo "✗ HTTP server not responding, cannot run browser tests" | tee -a "$LOG_FILE"
+    echo "✗ HTTP server not responding, cannot run browser tests"
     exit 1
 fi
 
 # Run Playwright tests
-echo "Running Playwright browser tests..." | tee -a "$LOG_FILE"
-if DISPLAY=${DISPLAY:-:99} node browser_test.js 2>&1 | tee -a "$LOG_FILE"; then
-    echo "✓ All browser UI tests passed" | tee -a "$LOG_FILE"
+echo "Running Playwright browser tests..."
+if DISPLAY=${DISPLAY:-:99} node browser_test.js 2>&1; then
+    echo "✓ All browser UI tests passed"
     rm -f browser_test.js  # Clean up the script
 else
-    echo "✗ Browser UI tests failed" | tee -a "$LOG_FILE"
+    echo "✗ Browser UI tests failed"
     rm -f browser_test.js  # Clean up the script
     exit 1
 fi

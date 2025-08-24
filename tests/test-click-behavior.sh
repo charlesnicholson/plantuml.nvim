@@ -4,37 +4,36 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-LOG_FILE="$(mktemp -d)/click-behavior-test.log"
 
-echo "Testing comprehensive click behavior..." | tee "$LOG_FILE"
+echo "Testing comprehensive click behavior..."
 
 # Start Neovim with plugin in background
-echo "Starting Neovim with plugin..." | tee -a "$LOG_FILE"
+echo "Starting Neovim with plugin..."
 nvim --headless -u ~/.config/nvim/init.lua -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" &
 NVIM_PID=$!
 
 # Wait for server to be ready
-echo "Waiting for server to be ready..." | tee -a "$LOG_FILE"
+echo "Waiting for server to be ready..."
 for i in {1..10}; do
     if netstat -tuln 2>/dev/null | grep -q "127.0.0.1:8764"; then
-        echo "HTTP server is listening" | tee -a "$LOG_FILE"
+        echo "HTTP server is listening"
         break
     fi
-    echo "Waiting for HTTP server to start (attempt $i/10)..." | tee -a "$LOG_FILE"
+    echo "Waiting for HTTP server to start (attempt $i/10)..."
     sleep 1
 done
 
 # Verify HTTP server is running
 if ! netstat -tuln 2>/dev/null | grep -q "127.0.0.1:8764"; then
-    echo "HTTP server not found" | tee -a "$LOG_FILE"
+    echo "HTTP server not found"
     kill $NVIM_PID 2>/dev/null || true
     exit 1
 fi
 
-echo "Verifying HTTP server is running..." | tee -a "$LOG_FILE"
+echo "Verifying HTTP server is running..."
 
 # Create comprehensive browser test
-echo "Running comprehensive Playwright browser tests..." | tee -a "$LOG_FILE"
+echo "Running comprehensive Playwright browser tests..."
 
 # Use node to run playwright tests
 node << 'EOF'
@@ -716,11 +715,11 @@ const { chromium } = require('playwright');
 })();
 EOF
 
-echo "✓ All comprehensive click behavior tests passed" | tee -a "$LOG_FILE"
+echo "✓ All comprehensive click behavior tests passed"
 
 # Cleanup
-echo "Cleaning up..." | tee -a "$LOG_FILE"
+echo "Cleaning up..."
 kill $NVIM_PID 2>/dev/null || true
 wait $NVIM_PID 2>/dev/null || true
 
-echo "Comprehensive click behavior test completed successfully!" | tee -a "$LOG_FILE"
+echo "Comprehensive click behavior test completed successfully!"
