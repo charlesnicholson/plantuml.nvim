@@ -7,11 +7,11 @@ A pure Lua Neovim plugin that provides **real-time PlantUML diagram rendering** 
 
 The plugin runs a local HTTP server on `http://127.0.0.1:8764/` with a WebSocket connection for real-time updates. Simply:
 
-1. Open a `.puml` file in Neovim
-2. Browse to the local server URL  
-3. Watch your diagrams update instantly as you save, edit, or switch between PlantUML files
+1. Open a `plantuml` filetype file in Neovim (`.puml` by default, you can add more)
+2. Browse to the local server URL.
+3. Watch your diagrams update instantly as you save, edit, or switch between PlantUML files.
 
-The browser page shows a **Live** status indicator when connected and automatically refreshes diagrams whenever you interact with `.puml` files in Neovim.
+The browser page shows a live status indicator and automatically refreshes diagrams that are opened, saved, or entered in Neovim.
 
 ## Installation
 
@@ -49,13 +49,13 @@ require("plantuml").setup({
 The plugin supports the following configuration options:
 
 - `auto_start` (boolean, default: `true`) - Whether to automatically start the server when the plugin loads
-- `auto_update` (boolean, default: `true`) - Whether to automatically update diagrams when PlantUML files are saved/opened/entered
+- `auto_update` (boolean, default: `true`) - Whether to automatically update diagrams when files are saved/opened/entered
 - `http_port` (number, default: `8764`) - Port for the HTTP server (WebSocket server uses http_port + 1)
-- `plantuml_server_url` (string, default: `"http://www.plantuml.com/plantuml"`) - Base URL for the PlantUML server (the `/png/~1` component is automatically appended)
+- `plantuml_server_url` (string, default: `"http://www.plantuml.com/plantuml"`) - Base URL for the PlantUML server
 - `auto_launch_browser` (string, default: `"never"`) - Controls automatic browser launching:
   - `"never"` - Never automatically launch a browser
-  - `"always"` - Always launch a browser if no clients are connected when a PlantUML file is opened/saved/etc
-  - `"once"` - Only launch a browser once per Neovim session when a PlantUML file is opened/saved/etc
+  - `"always"` - Always launch a browser if no clients are connected when a file is opened/saved/etc
+  - `"once"` - Only launch a browser once per Neovim session when a file is opened/saved/etc
 
 ## Commands
 
@@ -66,4 +66,4 @@ The plugin provides the following user commands:
 - `:PlantumlServerStart` - Start the PlantUML server (useful when `auto_start = false`)
 - `:PlantumlServerStop` - Stop the PlantUML server
 
-When `auto_update = true` (default), diagrams update automatically when you save, open, or enter a buffer with a `.puml` file extension. Use `:PlantumlUpdate` for manual refreshes or when automatic updates are disabled.
+When `auto_update = true` (default), diagrams update automatically when you save, open, or enter a buffer with a `plantuml` filetype extension. Use `:PlantumlUpdate` for manual refreshes or when automatic updates are disabled.
