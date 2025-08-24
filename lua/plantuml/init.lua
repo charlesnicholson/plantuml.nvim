@@ -358,7 +358,7 @@ end
 
 local function get_plantuml_server_url()
   if config.use_docker then
-    return "http://localhost:" .. config.docker_port .. "/plantuml"
+    return "http://localhost:" .. config.docker_port
   else
     return config.plantuml_server_url
   end

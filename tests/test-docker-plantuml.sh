@@ -155,6 +155,9 @@ nvim --headless --clean \
 
 echo "✓ Docker container lifecycle tests passed"
 
+# Cleanup between tests to ensure clean state
+cleanup
+
 echo "Test 3: Test HTTP connectivity to Docker PlantUML server"
 
 # Start container for HTTP test
@@ -205,7 +208,7 @@ print(encoded)
 ")
 
 # Test the PNG endpoint
-if curl -s -f "http://localhost:$HOST_PORT/plantuml/png/~1$COMPRESSED" -o /tmp/test_diagram.png; then
+if curl -s -f "http://localhost:$HOST_PORT/png/$COMPRESSED" -o /tmp/test_diagram.png; then
     echo "✓ PlantUML diagram generation successful"
 else
     echo "✗ PlantUML diagram generation failed"
