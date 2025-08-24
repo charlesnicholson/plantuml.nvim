@@ -253,14 +253,14 @@ local html_content = [[
       return;
     }
     
-    const condition3 = isFitToPage && !isAtNaturalSize && fitsVertically && isLandscape;
-    console.log('Condition 3 - isFitToPage && !isImageAtNaturalSize() && doesImageFitVertically() && img.naturalWidth > img.naturalHeight:', condition3);
+    const condition3 = isFitToPage && !isAtNaturalSize && isLandscape;
+    console.log('Condition 3 - isFitToPage && !isImageAtNaturalSize() && img.naturalWidth > img.naturalHeight:', condition3);
     console.log('  - isFitToPage:', isFitToPage);
     console.log('  - !isImageAtNaturalSize():', !isAtNaturalSize);
-    console.log('  - doesImageFitVertically():', fitsVertically);
+    console.log('  - doesImageFitVertically():', fitsVertically, '(not used for condition)');
     console.log('  - img.naturalWidth > img.naturalHeight:', isLandscape);
     if (condition3) {
-      console.log('EARLY RETURN: Wide minified image that fits vertically - click ignored');
+      console.log('EARLY RETURN: Wide minified landscape image - click ignored');
       return;
     }
     

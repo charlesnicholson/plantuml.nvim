@@ -581,6 +581,128 @@ const { chromium } = require('playwright');
       console.log('⚠ CSS positioning: Image position unclear but align-items is ' + positioningTest.alignItems);
     }
     
+    // Test 9: Maintainer's specific bug scenario (Issue #47 reproduction)
+    console.log('Testing maintainer specific bug scenario (Issue #47)...');
+    
+    const maintainerBugTest = await page.evaluate(() => {
+      const board = document.getElementById('board');
+      const img = document.getElementById('img');
+      
+      // Reset board 
+      board.style.width = '';
+      board.style.height = '';
+      board.className = 'board';
+      
+      // Create image matching maintainer's exact logs: 2832 x 989
+      const canvas = document.createElement('canvas');
+      canvas.width = 2832;
+      canvas.height = 989;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(0, 0, 2832, 989);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '60px Arial';
+      ctx.fillText('2832x989 - Maintainer Bug Test', 100, 200);
+      
+      img.src = canvas.toDataURL();
+      
+      // Set board to maintainer's dimensions: 1704 x 854.8125
+      board.style.width = '1704px';
+      board.style.height = '854.8125px';
+      
+      return new Promise((resolve) => {
+        img.onload = () => {
+          // Set plugin state as in maintainer's logs
+          board.classList.add('fit-to-page');
+          board.classList.add('has-diagram');
+          window.hasLoadedDiagram = true;
+          window.isFitToPage = true;
+          
+          setTimeout(() => {
+            const rect = img.getBoundingClientRect();
+            const boardRect = board.getBoundingClientRect();
+            
+            const isAtNaturalSizeResult = window.isImageAtNaturalSize ? window.isImageAtNaturalSize() : null;
+            const fitsVerticallyResult = window.doesImageFitVertically ? window.doesImageFitVertically() : null;
+            const isLandscape = img.naturalWidth > img.naturalHeight;
+            
+            // The corrected condition (without fitsVertically requirement)
+            const shouldIgnoreClick = window.isFitToPage && !isAtNaturalSizeResult && isLandscape;
+            
+            const testInfo = {
+              scenario: 'Maintainer exact reproduction',
+              naturalSize: { width: img.naturalWidth, height: img.naturalHeight },
+              renderedSize: { width: Math.round(rect.width), height: Math.round(rect.height) },
+              boardSize: { width: Math.round(boardRect.width), height: Math.round(boardRect.height) },
+              isAtNaturalSize: isAtNaturalSizeResult,
+              fitsVertically: fitsVerticallyResult,
+              isLandscape: isLandscape,
+              aspectRatio: (img.naturalWidth / img.naturalHeight).toFixed(2),
+              shouldIgnoreClick: shouldIgnoreClick,
+              conditions: {
+                isFitToPage: window.isFitToPage,
+                notAtNaturalSize: !isAtNaturalSizeResult,
+                isLandscape: isLandscape,
+                fitsVertically: fitsVerticallyResult
+              }
+            };
+            
+            resolve(testInfo);
+          }, 100);
+        };
+      });
+    });
+    
+    console.log('Maintainer bug test info:', JSON.stringify(maintainerBugTest, null, 2));
+    
+    // Verify this matches the maintainer's logs
+    if (maintainerBugTest.naturalSize.width === 2832 && 
+        maintainerBugTest.naturalSize.height === 989 &&
+        maintainerBugTest.boardSize.width === 1704 &&
+        Math.abs(maintainerBugTest.boardSize.height - 854.8125) < 1) {
+      console.log('✓ Dimensions match maintainer logs exactly');
+    } else {
+      throw new Error('Dimension mismatch with maintainer logs');
+    }
+    
+    // The key test: should ignore click now (previously didn't)
+    if (maintainerBugTest.shouldIgnoreClick) {
+      console.log('✓ Fixed condition correctly identifies this scenario should ignore clicks');
+      
+      // Test actual click behavior
+      const initialState = await page.evaluate(() => {
+        return {
+          isFitToPage: window.isFitToPage,
+          hasFitToPageClass: document.getElementById('board').classList.contains('fit-to-page')
+        };
+      });
+      
+      console.log('Before click:', initialState);
+      
+      // Click should be ignored
+      await page.click('#board');
+      await page.waitForTimeout(200);
+      
+      const afterClickState = await page.evaluate(() => {
+        return {
+          isFitToPage: window.isFitToPage,
+          hasFitToPageClass: document.getElementById('board').classList.contains('fit-to-page')
+        };
+      });
+      
+      console.log('After click:', afterClickState);
+      
+      const clickWasProcessed = initialState.isFitToPage !== afterClickState.isFitToPage;
+      
+      if (clickWasProcessed) {
+        throw new Error('MAINTAINER BUG STILL EXISTS: Click was processed when it should be ignored!');
+      } else {
+        console.log('✓ MAINTAINER BUG FIXED: Click correctly ignored for wide landscape minified image');
+      }
+    } else {
+      throw new Error('Fixed condition should identify this scenario as needing click ignore');
+    }
+
     console.log('All comprehensive click behavior tests completed successfully!');
     
   } catch (error) {
