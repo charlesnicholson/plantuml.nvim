@@ -1,9 +1,24 @@
 local M = {}
 
+local function is_windows()
+  return vim.fn.has('win32') == 1 or vim.fn.has('win64') == 1
+end
+
+local function get_docker_cmd()
+  return is_windows() and "docker.exe" or "docker"
+end
+
 local function run_command(cmd, callback)
+  local shell_cmd
+  if is_windows() then
+    shell_cmd = { 'cmd', '/c', cmd }
+  else
+    shell_cmd = { 'sh', '-c', cmd }
+  end
+  
   if callback then
     vim.system(
-      { 'sh', '-c', cmd },
+      shell_cmd,
       {
         text = true,
         timeout = 120000,
@@ -19,9 +34,9 @@ local function run_command(cmd, callback)
         end)
       end
     )
-    return nil, nil
   else
-    local handle = io.popen(cmd .. " 2>&1")
+    local redirect_suffix = is_windows() and " 2>NUL" or " 2>&1"
+    local handle = io.popen(cmd .. redirect_suffix)
     if not handle then
       return nil, "Failed to execute command"
     end
@@ -33,41 +48,43 @@ local function run_command(cmd, callback)
   end
 end
 
-local function is_windows()
-  return vim.fn.has('win32') == 1 or vim.fn.has('win64') == 1
-end
-
-local function get_docker_cmd()
-  return is_windows() and "docker.exe" or "docker"
-end
-
 function M.is_docker_available(callback)
   local docker_cmd = get_docker_cmd()
+  local cmd = docker_cmd .. " --version"
   
-  if callback then
-    run_command(docker_cmd .. " --version", function(result, err)
-      local available = result ~= nil and result:match("Docker version")
-      callback(available, err)
-    end)
-  else
-    local result, err = run_command(docker_cmd .. " --version")
+  local function check_result(result, err)
     local available = result ~= nil and result:match("Docker version")
     return available, err
+  end
+  
+  if callback then
+    run_command(cmd, function(result, err)
+      local available, error = check_result(result, err)
+      callback(available, error)
+    end)
+  else
+    local result, err = run_command(cmd)
+    return check_result(result, err)
   end
 end
 
 function M.is_docker_running(callback)
   local docker_cmd = get_docker_cmd()
+  local cmd = docker_cmd .. " info"
   
-  if callback then
-    run_command(docker_cmd .. " info", function(result, err)
-      local is_running = result ~= nil and not result:match("Cannot connect to the Docker daemon")
-      callback(is_running, err)
-    end)
-  else
-    local result, err = run_command(docker_cmd .. " info")
+  local function check_result(result, err)
     local is_running = result ~= nil and not result:match("Cannot connect to the Docker daemon")
     return is_running, err
+  end
+  
+  if callback then
+    run_command(cmd, function(result, err)
+      local is_running, error = check_result(result, err)
+      callback(is_running, error)
+    end)
+  else
+    local result, err = run_command(cmd)
+    return check_result(result, err)
   end
 end
 
@@ -75,51 +92,36 @@ function M.get_container_status(container_name, callback)
   local docker_cmd = get_docker_cmd()
   local cmd = string.format('%s ps -a --filter "name=%s" --format "{{.Status}}"', docker_cmd, container_name)
   
-  if callback then
-    run_command(cmd, function(result, err)
-      if not result or result:match("^%s*$") then
-        callback("not_found", nil)
-        return
-      end
-      
-      result = result:gsub("%s+$", "")
-      
-      local status
-      if result:match("^Up") then
-        status = "running"
-      elseif result:match("^Exited") then
-        status = "stopped"
-      else
-        status = "unknown"
-      end
-      
-      callback(status, status == "unknown" and result or nil)
-    end)
-  else
-    local result, err = run_command(cmd)
-    
+  local function parse_status(result, err)
     if not result or result:match("^%s*$") then
       return "not_found", nil
     end
     
     result = result:gsub("%s+$", "")
     
-    local status
     if result:match("^Up") then
-      status = "running"
+      return "running", nil
     elseif result:match("^Exited") then
-      status = "stopped"
+      return "stopped", nil
     else
-      status = "unknown"
+      return "unknown", result
     end
-    
-    return status, status == "unknown" and result or nil
+  end
+  
+  if callback then
+    run_command(cmd, function(result, err)
+      local status, error = parse_status(result, err)
+      callback(status, error)
+    end)
+  else
+    local result, err = run_command(cmd)
+    return parse_status(result, err)
   end
 end
 
 function M.get_container_port(container_name, internal_port)
   local docker_cmd = get_docker_cmd()
-  local cmd = string.format('%s port %s %s 2>/dev/null', docker_cmd, container_name, internal_port)
+  local cmd = string.format('%s port %s %s', docker_cmd, container_name, internal_port)
   local result, err = run_command(cmd)
   
   if not result or result:match("^%s*$") then
@@ -137,66 +139,73 @@ end
 function M.start_container(container_name, image, host_port, internal_port, callback)
   local docker_cmd = get_docker_cmd()
   
+  local function start_existing()
+    local cmd = string.format('%s start %s', docker_cmd, container_name)
+    if callback then
+      run_command(cmd, function(result, err)
+        callback(result ~= nil, err or "Failed to start existing container")
+      end)
+    else
+      local result, err = run_command(cmd)
+      return result ~= nil, err or "Failed to start existing container"
+    end
+  end
+  
+  local function create_new()
+    local cmd = string.format('%s run -d --name %s -p %d:%d %s', 
+                             docker_cmd, container_name, host_port, internal_port, image)
+    if callback then
+      run_command(cmd, function(result, err)
+        callback(result ~= nil, err or "Failed to create and start container")
+      end)
+    else
+      local result, err = run_command(cmd)
+      return result ~= nil, err or "Failed to create and start container"
+    end
+  end
+  
   if callback then
     M.get_container_status(container_name, function(status, _)
       if status == "running" then
         callback(true, "Container already running")
       elseif status == "stopped" then
-        local cmd = string.format('%s start %s', docker_cmd, container_name)
-        run_command(cmd, function(result, err)
-          local success = result ~= nil
-          callback(success, err or "Failed to start existing container")
-        end)
+        start_existing()
       else
-        local cmd = string.format('%s run -d --name %s -p %d:%d %s', 
-                                 docker_cmd, container_name, host_port, internal_port, image)
-        run_command(cmd, function(result, err)
-          local success = result ~= nil
-          callback(success, err or "Failed to create and start container")
-        end)
+        create_new()
       end
     end)
   else
     local status, _ = M.get_container_status(container_name)
-    
     if status == "running" then
       return true, "Container already running"
     elseif status == "stopped" then
-      local cmd = string.format('%s start %s', docker_cmd, container_name)
-      local result, err = run_command(cmd)
-      local success = result ~= nil
-      return success, err or "Failed to start existing container"
+      return start_existing()
     else
-      local cmd = string.format('%s run -d --name %s -p %d:%d %s', 
-                               docker_cmd, container_name, host_port, internal_port, image)
-      local result, err = run_command(cmd)
-      local success = result ~= nil
-      return success, err or "Failed to create and start container"
+      return create_new()
     end
   end
 end
 
 function M.stop_container(container_name)
   local docker_cmd = get_docker_cmd()
-  local cmd = string.format('%s stop %s 2>/dev/null', docker_cmd, container_name)
+  local cmd = string.format('%s stop %s', docker_cmd, container_name)
   local result, err = run_command(cmd)
   return result ~= nil, err
 end
 
 function M.remove_container(container_name)
   local docker_cmd = get_docker_cmd()
-  local cmd = string.format('%s rm %s 2>/dev/null', docker_cmd, container_name)
+  local cmd = string.format('%s rm %s', docker_cmd, container_name)
   local result, err = run_command(cmd)
   return result ~= nil, err
 end
 
 function M.wait_for_container_ready(container_name, timeout_seconds, callback)
   timeout_seconds = timeout_seconds or 30
+  local start_time = os.time()
   
-  if callback then
-    local start_time = os.time()
-    
-    local function check_status()
+  local function check_status()
+    if callback then
       M.get_container_status(container_name, function(status, _)
         if status == "running" then
           callback(true, nil)
@@ -206,22 +215,20 @@ function M.wait_for_container_ready(container_name, timeout_seconds, callback)
           vim.defer_fn(check_status, 1000)
         end
       end)
-    end
-    
-    check_status()
-  else
-    local start_time = os.time()
-    
-    while os.time() - start_time < timeout_seconds do
+    else
       local status, _ = M.get_container_status(container_name)
       if status == "running" then
         return true, nil
+      elseif os.time() - start_time >= timeout_seconds then
+        return false, "Container failed to start within timeout"
+      else
+        vim.wait(1000)
+        return check_status()
       end
-      vim.wait(1000)
     end
-    
-    return false, "Container failed to start within timeout"
   end
+  
+  return check_status()
 end
 
 function M.pull_image(image)
