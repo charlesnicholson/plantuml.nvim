@@ -299,9 +299,9 @@ function server.start()
   end)
 end
 
-local function start_docker_server()
+local function start_docker_server(callback)
   if not config.use_docker then
-    return true, nil
+    if callback then callback(true, nil) else return true, nil end
   end
 
   server.broadcast({
@@ -310,98 +310,213 @@ local function start_docker_server()
     status = "Checking Docker availability..."
   })
 
-  local available, err = docker.is_docker_available()
-  if not available then
-    server.broadcast({
-      type = "docker_status",
-      operation = "docker_check",
-      status = "Docker not available",
-      error = true
-    })
-    return false, "[plantuml.nvim] Docker is not available: " .. (err or "unknown error")
-  end
+  if callback then
+    docker.is_docker_available(function(available, err)
+      if not available then
+        server.broadcast({
+          type = "docker_status",
+          operation = "docker_check",
+          status = "Docker not available",
+          error = true
+        })
+        callback(false, "[plantuml.nvim] Docker is not available: " .. (err or "unknown error"))
+        return
+      end
 
-  local running, err = docker.is_docker_running()
-  if not running then
-    server.broadcast({
-      type = "docker_status",
-      operation = "docker_check",
-      status = "Docker daemon not running",
-      error = true
-    })
-    return false, "[plantuml.nvim] Docker daemon is not running: " .. (err or "unknown error")
-  end
+      docker.is_docker_running(function(running, err)
+        if not running then
+          server.broadcast({
+            type = "docker_status",
+            operation = "docker_check",
+            status = "Docker daemon not running",
+            error = true
+          })
+          callback(false, "[plantuml.nvim] Docker daemon is not running: " .. (err or "unknown error"))
+          return
+        end
 
-  local status, _ = docker.get_container_status(docker_container_name)
+        docker.get_container_status(docker_container_name, function(status, _)
+          if status == "running" then
+            vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
+            server.broadcast({
+              type = "docker_status",
+              operation = "container_reuse",
+              status = "Using existing Docker container"
+            })
+            callback(true, nil)
+            return
+          elseif status == "stopped" then
+            vim.notify("[plantuml.nvim] Restarting PlantUML Docker container...", vim.log.levels.INFO)
+            server.broadcast({
+              type = "docker_status",
+              operation = "container_start",
+              status = "Restarting Docker container..."
+            })
+          else
+            vim.notify("[plantuml.nvim] Starting PlantUML Docker container...", vim.log.levels.INFO)
+            server.broadcast({
+              type = "docker_status",
+              operation = "container_start",
+              status = "Starting Docker container..."
+            })
+          end
 
-  if status == "running" then
-    vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
-    server.broadcast({
-      type = "docker_status",
-      operation = "container_reuse",
-      status = "Using existing Docker container"
-    })
-  elseif status == "stopped" then
-    vim.notify("[plantuml.nvim] Restarting PlantUML Docker container...", vim.log.levels.INFO)
-    server.broadcast({
-      type = "docker_status",
-      operation = "container_start",
-      status = "Restarting Docker container..."
-    })
+          docker.start_container(
+            docker_container_name,
+            config.docker_image,
+            config.docker_port,
+            8080,
+            function(success, err)
+              if not success then
+                server.broadcast({
+                  type = "docker_status",
+                  operation = "container_start",
+                  status = "Failed to start container",
+                  error = true
+                })
+                callback(false, "[plantuml.nvim] Failed to start Docker container: " .. (err or "unknown error"))
+                return
+              end
+
+              if status ~= "running" then
+                server.broadcast({
+                  type = "docker_status",
+                  operation = "container_ready",
+                  status = "Waiting for container to be ready..."
+                })
+
+                docker.wait_for_container_ready(docker_container_name, 30, function(ready, err)
+                  if not ready then
+                    server.broadcast({
+                      type = "docker_status",
+                      operation = "container_ready",
+                      status = "Container failed to be ready",
+                      error = true
+                    })
+                    callback(false, "[plantuml.nvim] Docker container failed to be ready: " .. (err or "timeout"))
+                    return
+                  end
+
+                  vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
+                  server.broadcast({
+                    type = "docker_status",
+                    operation = "container_ready",
+                    status = "Docker container ready",
+                    completed = true
+                  })
+
+                  callback(true, nil)
+                end)
+              else
+                vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
+                server.broadcast({
+                  type = "docker_status",
+                  operation = "container_ready",
+                  status = "Docker container ready",
+                  completed = true
+                })
+
+                callback(true, nil)
+              end
+            end
+          )
+        end)
+      end)
+    end)
   else
-    vim.notify("[plantuml.nvim] Starting PlantUML Docker container...", vim.log.levels.INFO)
-    server.broadcast({
-      type = "docker_status",
-      operation = "container_start",
-      status = "Starting Docker container..."
-    })
-  end
+    local available, err = docker.is_docker_available()
+    if not available then
+      server.broadcast({
+        type = "docker_status",
+        operation = "docker_check",
+        status = "Docker not available",
+        error = true
+      })
+      return false, "[plantuml.nvim] Docker is not available: " .. (err or "unknown error")
+    end
 
-  local success, err = docker.start_container(
-    docker_container_name,
-    config.docker_image,
-    config.docker_port,
-    8080
-  )
+    local running, err = docker.is_docker_running()
+    if not running then
+      server.broadcast({
+        type = "docker_status",
+        operation = "docker_check",
+        status = "Docker daemon not running",
+        error = true
+      })
+      return false, "[plantuml.nvim] Docker daemon is not running: " .. (err or "unknown error")
+    end
 
-  if not success then
-    server.broadcast({
-      type = "docker_status",
-      operation = "container_start",
-      status = "Failed to start container",
-      error = true
-    })
-    return false, "[plantuml.nvim] Failed to start Docker container: " .. (err or "unknown error")
-  end
+    local status, _ = docker.get_container_status(docker_container_name)
 
-  if status ~= "running" then
-    server.broadcast({
-      type = "docker_status",
-      operation = "container_ready",
-      status = "Waiting for container to be ready..."
-    })
+    if status == "running" then
+      vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
+      server.broadcast({
+        type = "docker_status",
+        operation = "container_reuse",
+        status = "Using existing Docker container"
+      })
+    elseif status == "stopped" then
+      vim.notify("[plantuml.nvim] Restarting PlantUML Docker container...", vim.log.levels.INFO)
+      server.broadcast({
+        type = "docker_status",
+        operation = "container_start",
+        status = "Restarting Docker container..."
+      })
+    else
+      vim.notify("[plantuml.nvim] Starting PlantUML Docker container...", vim.log.levels.INFO)
+      server.broadcast({
+        type = "docker_status",
+        operation = "container_start",
+        status = "Starting Docker container..."
+      })
+    end
 
-    local ready, err = docker.wait_for_container_ready(docker_container_name, 30)
-    if not ready then
+    local success, err = docker.start_container(
+      docker_container_name,
+      config.docker_image,
+      config.docker_port,
+      8080
+    )
+
+    if not success then
+      server.broadcast({
+        type = "docker_status",
+        operation = "container_start",
+        status = "Failed to start container",
+        error = true
+      })
+      return false, "[plantuml.nvim] Failed to start Docker container: " .. (err or "unknown error")
+    end
+
+    if status ~= "running" then
       server.broadcast({
         type = "docker_status",
         operation = "container_ready",
-        status = "Container failed to be ready",
-        error = true
+        status = "Waiting for container to be ready..."
       })
-      return false, "[plantuml.nvim] Docker container failed to be ready: " .. (err or "timeout")
+
+      local ready, err = docker.wait_for_container_ready(docker_container_name, 30)
+      if not ready then
+        server.broadcast({
+          type = "docker_status",
+          operation = "container_ready",
+          status = "Container failed to be ready",
+          error = true
+        })
+        return false, "[plantuml.nvim] Docker container failed to be ready: " .. (err or "timeout")
+      end
     end
+
+    vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
+    server.broadcast({
+      type = "docker_status",
+      operation = "container_ready",
+      status = "Docker container ready",
+      completed = true
+    })
+
+    return true, nil
   end
-
-  vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
-  server.broadcast({
-    type = "docker_status",
-    operation = "container_ready",
-    status = "Docker container ready",
-    completed = true
-  })
-
-  return true, nil
 end
 
 local function stop_docker_server()
@@ -512,14 +627,22 @@ function M.update_diagram()
 end
 
 function M.start()
-  if config.use_docker then
-    local success, err = start_docker_server()
-    if not success then
-      vim.notify(err, vim.log.levels.ERROR)
-      return false
-    end
-  end
   server.start()
+  
+  if config.use_docker then
+    start_docker_server(function(success, err)
+      if not success then
+        vim.notify(err, vim.log.levels.ERROR)
+        server.broadcast({
+          type = "docker_status",
+          operation = "error",
+          status = "Docker startup failed",
+          error = true
+        })
+      end
+    end)
+  end
+  
   return true
 end
 
@@ -575,6 +698,10 @@ function M.setup(user_config)
       vim.notify("[plantuml.nvim] Warning: plantuml_server_url is ignored when use_docker is enabled",
         vim.log.levels.WARN)
     end
+  end
+
+  if config.auto_start then
+    M.start()
   end
 end
 
