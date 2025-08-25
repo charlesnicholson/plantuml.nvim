@@ -88,10 +88,11 @@ The plugin can run a local PlantUML server in Docker instead of using the extern
 - `docker_port` (number, default: `8080`) - Host port to bind the Docker container
 - `docker_remove_on_stop` (boolean, default: `false`) - Whether to remove the container when stopping the server
 
+You must have docker installed and the engine running; this plugin just pulls and run the PlantUML image.
+
 Docker mode provides:
 - Local PlantUML rendering without external dependencies
 - Automatic container lifecycle management (start, stop, reattach)
-- Cross-platform support (Windows, Linux, macOS)
 - No external network requests for diagram generation
 
 ## Commands
@@ -101,6 +102,10 @@ The plugin provides the following user commands:
 - `:PlantumlUpdate` - Manually trigger a PlantUML diagram update for the current buffer
 - `:PlantumlLaunchBrowser` - Open the PlantUML web viewer in your default browser
 - `:PlantumlServerStart` - Start the PlantUML server (useful when `auto_start = false`)
+
+## Notes
+
+This plugin is my foray into "vibe coding" with GitHub Copilot. The only thing I've touched is this README.md file.
 - `:PlantumlServerStop` - Stop the PlantUML server
 
 When `auto_update = true` (default), diagrams update automatically when you save, open, or enter a buffer with a `plantuml` filetype extension. Use `:PlantumlUpdate` for manual refreshes or when automatic updates are disabled.
