@@ -102,10 +102,10 @@ The plugin provides the following user commands:
 - `:PlantumlUpdate` - Manually trigger a PlantUML diagram update for the current buffer
 - `:PlantumlLaunchBrowser` - Open the PlantUML web viewer in your default browser
 - `:PlantumlServerStart` - Start the PlantUML server (useful when `auto_start = false`)
+- `:PlantumlServerStop` - Stop the PlantUML server
+
+When `auto_update = true` (default), diagrams update automatically when you save, open, or enter a buffer with a `plantuml` filetype extension. Use `:PlantumlUpdate` for manual refreshes or when automatic updates are disabled.
 
 ## Notes
 
 This plugin is my foray into "vibe coding" with GitHub Copilot. The only thing I've touched is this README.md file.
-- `:PlantumlServerStop` - Stop the PlantUML server
-
-When `auto_update = true` (default), diagrams update automatically when you save, open, or enter a buffer with a `plantuml` filetype extension. Use `:PlantumlUpdate` for manual refreshes or when automatic updates are disabled.
