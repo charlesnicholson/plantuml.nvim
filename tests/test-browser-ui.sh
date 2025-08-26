@@ -355,13 +355,11 @@ const { chromium } = require('playwright');
       return {
         original: testFilename,
         narrowTruncated: narrowTruncated,
-        narrowWidth: narrowMaxWidth,
-        currentFilenameSet: window.currentFilename
+        narrowWidth: narrowMaxWidth
       };
     });
     
     console.log('Filename after narrow setup:', setupResult.narrowTruncated);
-    console.log('Current filename variable:', setupResult.currentFilenameSet);
     
     // Verify we actually got truncation
     if (setupResult.narrowTruncated === setupResult.original) {
@@ -369,53 +367,39 @@ const { chromium } = require('playwright');
     }
     
     // Now simulate expanding the window
-    const resizeResult = await page.evaluate(() => {
+    await page.evaluate(() => {
       const filenameSection = document.querySelector('.filename-section');
       
       // Expand the filename section width significantly
       filenameSection.style.width = '400px';
       
-      // Check if our functions exist
-      const hasUpdateFunction = typeof window.updateFilenameDisplay === 'function';
-      const hasCurrentFilename = window.currentFilename;
-      
       // Manually call the update function to test it directly
-      if (hasUpdateFunction) {
+      if (typeof window.updateFilenameDisplay === 'function') {
         window.updateFilenameDisplay();
       }
       
       // Also trigger a resize event
       window.dispatchEvent(new Event('resize'));
       
-      return {
-        hasUpdateFunction: hasUpdateFunction,
-        hasCurrentFilename: hasCurrentFilename,
-        newWidth: filenameSection.getBoundingClientRect().width
-      };
+      return true;
     });
-    
-    console.log('Resize result:', resizeResult);
     
     // Wait a moment for resize handler to process
     await page.waitForTimeout(100);
     
     const expandedResult = await page.evaluate(() => {
-      return {
-        displayText: document.getElementById('file').textContent,
-        currentFilename: window.currentFilename
-      };
+      return document.getElementById('file').textContent;
     });
-    console.log('Filename after expanded resize:', expandedResult.displayText);
-    console.log('Current filename after resize:', expandedResult.currentFilename);
+    console.log('Filename after expanded resize:', expandedResult);
     
     // Verify that the filename expanded when more space became available
-    if (expandedResult.displayText === setupResult.narrowTruncated) {
-      throw new Error(`Filename did not re-truncate on resize. Expected expansion from "${setupResult.narrowTruncated}" but got "${expandedResult.displayText}"`);
+    if (expandedResult === setupResult.narrowTruncated) {
+      throw new Error(`Filename did not re-truncate on resize. Expected expansion from "${setupResult.narrowTruncated}" but got "${expandedResult}"`);
     }
     
     // Verify the expanded result shows more of the path than the narrow version
-    if (expandedResult.displayText.length <= setupResult.narrowTruncated.length) {
-      throw new Error(`Expanded filename should be longer than narrow version. Narrow: "${setupResult.narrowTruncated}", Expanded: "${expandedResult.displayText}"`);
+    if (expandedResult.length <= setupResult.narrowTruncated.length) {
+      throw new Error(`Expanded filename should be longer than narrow version. Narrow: "${setupResult.narrowTruncated}", Expanded: "${expandedResult}"`);
     }
     
     console.log('✓ Filename successfully re-truncated on browser resize');
