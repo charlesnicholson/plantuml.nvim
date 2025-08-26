@@ -302,8 +302,15 @@
       }
     }
 
+    function updateFilenameDisplaySafe() {
+      requestAnimationFrame(() => {
+        updateFilenameDisplay();
+      });
+    }
+
     window.updateFilenameDisplay = updateFilenameDisplay;
-    window.addEventListener('resize', updateFilenameDisplay);
+    window.updateFilenameDisplaySafe = updateFilenameDisplaySafe;
+    window.addEventListener('resize', updateFilenameDisplaySafe);
 
     board.addEventListener('click', () => {
       if (!hasLoadedDiagram) {
@@ -352,7 +359,7 @@
             img.style.opacity = 0;
             if (data.filename) {
               window.currentFilename = data.filename;
-              updateFilenameDisplay();
+              updateFilenameDisplaySafe();
             }
             if (data.timestamp) {
               timestampEl.textContent = "Updated: " + data.timestamp;
