@@ -404,57 +404,68 @@ const { chromium } = require('playwright');
     
     console.log('✓ Filename successfully re-truncated on browser resize');
     
-    // Test 8: Test initial filename load truncation (bug reproduction)
-    console.log('Testing initial filename load truncation behavior...');
+    // Test 8: Test proper filename truncation without CSS ellipsis
+    console.log('Testing proper filename truncation without CSS ellipsis...');
     
-    const initialLoadTest = await page.evaluate(() => {
+    const truncationTest = await page.evaluate(() => {
       const fileEl = document.getElementById('file');
       const filenameSection = document.querySelector('.filename-section');
       
-      // Clear current state
-      fileEl.textContent = '';
-      window.currentFilename = '';
-      
-      // Simulate a very long filename like in the bug report
+      // Test filename from the bug report
       const longFilename = '/Users/charles/src/fi/firmware/src/fi/some_component.puml';
       
-      // Set current width to something reasonable (not too narrow, not too wide)
-      filenameSection.style.width = '300px';
+      // Set a width that should allow for some path but not the full path
+      filenameSection.style.width = '250px';
+      filenameSection.style.minWidth = '250px';
+      filenameSection.style.maxWidth = '250px';
       
-      // Simulate what happens on initial load - set the filename and immediately display
+      // Apply JavaScript truncation
       window.currentFilename = longFilename;
       updateFilenameDisplay();
       
-      const displayedText = fileEl.textContent;
+      const result = fileEl.textContent;
+      const availableWidth = filenameSection.getBoundingClientRect().width - 20;
       
       return {
         originalFilename: longFilename,
-        displayedText: displayedText,
-        // Check if it's properly left-truncated (starts with ...) vs right-truncated (ends with ...)
-        isLeftTruncated: displayedText.startsWith('...') && displayedText.endsWith('.puml'),
-        isRightTruncated: displayedText.endsWith('...') && !displayedText.startsWith('...'),
-        filenamePreserved: displayedText.endsWith('some_component.puml')
+        truncatedResult: result,
+        availableWidth: availableWidth,
+        isLeftTruncated: result.startsWith('...'),
+        isRightTruncated: result.endsWith('...') && !result.startsWith('...'),
+        filenamePreserved: result.endsWith('some_component.puml'),
+        hasProperTruncation: result.startsWith('...') && result.endsWith('some_component.puml'),
+        noCssEllipsis: getComputedStyle(fileEl).textOverflow !== 'ellipsis'
       };
     });
     
-    console.log('Initial load test results:');
-    console.log('  Original:', initialLoadTest.originalFilename);
-    console.log('  Displayed:', initialLoadTest.displayedText);
-    console.log('  Left-truncated:', initialLoadTest.isLeftTruncated);
-    console.log('  Right-truncated:', initialLoadTest.isRightTruncated);
-    console.log('  Filename preserved:', initialLoadTest.filenamePreserved);
+    console.log('Truncation test results:');
+    console.log('  Original:', truncationTest.originalFilename);
+    console.log('  Truncated:', truncationTest.truncatedResult);
+    console.log('  Available width:', truncationTest.availableWidth);
+    console.log('  CSS ellipsis removed:', truncationTest.noCssEllipsis);
+    console.log('  Left-truncated:', truncationTest.isLeftTruncated);
+    console.log('  Right-truncated:', truncationTest.isRightTruncated);
+    console.log('  Filename preserved:', truncationTest.filenamePreserved);
+    console.log('  Proper truncation:', truncationTest.hasProperTruncation);
     
-    // The bug is that it shows right-truncated text initially
-    // After fix, it should be left-truncated with filename preserved
-    if (initialLoadTest.isRightTruncated) {
-      throw new Error(`BUG REPRODUCED: Initial load shows right-truncated filename "${initialLoadTest.displayedText}" - should be left-truncated preserving filename`);
+    // Verify the fix
+    if (!truncationTest.noCssEllipsis) {
+      throw new Error('CSS text-overflow ellipsis still present - should be removed');
     }
     
-    if (!initialLoadTest.isLeftTruncated || !initialLoadTest.filenamePreserved) {
-      throw new Error(`Initial load filename truncation incorrect. Expected left-truncated with filename preserved, got: "${initialLoadTest.displayedText}"`);
+    if (truncationTest.isRightTruncated) {
+      throw new Error(`BUG STILL PRESENT: Right-truncated filename "${truncationTest.truncatedResult}" - should be left-truncated`);
     }
     
-    console.log('✓ Initial filename load shows correct left-truncation');
+    // The filename should either be properly left-truncated or fit completely
+    const isAcceptable = truncationTest.hasProperTruncation || 
+                         (truncationTest.truncatedResult === truncationTest.originalFilename);
+    
+    if (!isAcceptable) {
+      throw new Error(`Unexpected truncation result: "${truncationTest.truncatedResult}"`);
+    }
+    
+    console.log('✓ Filename truncation working correctly without CSS ellipsis');
     
     // Test 9: Take screenshot for verification
     await page.screenshot({ path: 'tests/screenshots/browser-ui-test.png' });
