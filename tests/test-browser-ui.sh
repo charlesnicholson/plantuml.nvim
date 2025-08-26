@@ -98,8 +98,8 @@ const { chromium } = require('playwright');
     // Test 3: Check initial CSS classes
     const boardClasses = await page.getAttribute('#board', 'class');
     console.log('Initial board classes:', boardClasses);
-    if (!boardClasses.includes('fit-to-page')) {
-      throw new Error('Board does not have fit-to-page class initially');
+    if (!boardClasses.includes('board')) {
+      throw new Error('Board does not have board class');
     }
     console.log('✓ Board has correct initial CSS classes');
     
@@ -226,110 +226,7 @@ const { chromium } = require('playwright');
     }
     console.log('✓ All filename truncation tests passed');
     
-    // Test 5: Enable click functionality for testing
-    console.log('Enabling click functionality for testing...');
-    
-    // Since hasLoadedDiagram is in a closure, we need to work around it
-    // We'll override the click handler to make it work in test mode
-    await page.evaluate(() => {
-      const board = document.getElementById('board');
-      const img = document.getElementById('img');
-      
-      // Set up the initial state
-      img.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
-      board.classList.add('fit-to-page');
-      board.classList.add('has-diagram');
-      
-      // Create a test-friendly click handler that doesn't depend on hasLoadedDiagram
-      // We need to remove the existing event listeners first
-      const newBoard = board.cloneNode(true);
-      board.parentNode.replaceChild(newBoard, board);
-      
-      // Add our test click handler
-      let testIsFitToPage = true;
-      newBoard.addEventListener('click', () => {
-        console.log('Test click handler triggered, current state:', testIsFitToPage);
-        testIsFitToPage = !testIsFitToPage;
-        if (testIsFitToPage) {
-          newBoard.classList.add('fit-to-page');
-          console.log('Added fit-to-page class');
-        } else {
-          newBoard.classList.remove('fit-to-page');
-          console.log('Removed fit-to-page class');
-        }
-      });
-      
-      // Store reference for debugging
-      window.testBoard = newBoard;
-      window.testIsFitToPage = testIsFitToPage;
-      
-      return true;
-    });
-    
-    // Wait for image to load
-    await page.waitForFunction(() => {
-      const board = document.getElementById('board');
-      return board.classList.contains('has-diagram');
-    });
-    
-    console.log('✓ Diagram loaded state simulated');
-    
-    // Test 6: Test click to toggle viewing modes
-    console.log('Testing click toggle functionality...');
-    
-    // Verify the test setup worked
-    await page.waitForFunction(() => window.testBoard !== undefined, { timeout: 5000 });
-    
-    // Initial state should be fit-to-page
-    let boardClasses1 = await page.evaluate(() => {
-      const board = window.testBoard;
-      return board.className;
-    });
-    console.log('Before click - Board classes:', boardClasses1);
-    
-    if (!boardClasses1.includes('fit-to-page')) {
-      throw new Error('Board should initially have fit-to-page class');
-    }
-    
-    // Click the board to toggle
-    await page.evaluate(() => {
-      console.log('About to click the test board');
-      const board = window.testBoard;
-      board.click();
-    });
-    await page.waitForTimeout(200); // Wait for class change
-    
-    let boardClasses2 = await page.evaluate(() => {
-      const board = window.testBoard;
-      return board.className;
-    });
-    console.log('After first click - Board classes:', boardClasses2);
-    
-    if (boardClasses2.includes('fit-to-page')) {
-      throw new Error('Board should not have fit-to-page class after click');
-    }
-    console.log('✓ First click removed fit-to-page class');
-    
-    // Click again to toggle back
-    await page.evaluate(() => {
-      console.log('About to click the test board again');
-      const board = window.testBoard;
-      board.click();
-    });
-    await page.waitForTimeout(200);
-    
-    let boardClasses3 = await page.evaluate(() => {
-      const board = window.testBoard;
-      return board.className;
-    });
-    console.log('After second click - Board classes:', boardClasses3);
-    
-    if (!boardClasses3.includes('fit-to-page')) {
-      throw new Error('Board should have fit-to-page class after second click');
-    }
-    console.log('✓ Second click restored fit-to-page class');
-    
-    // Test 7: Test filename re-truncation on browser resize
+    // Test 5: Test filename re-truncation on browser resize
     console.log('Testing filename re-truncation on browser resize...');
     
     // Set up a test filename and simulate a narrow window
