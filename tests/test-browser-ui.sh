@@ -172,14 +172,7 @@ const { chromium } = require('playwright');
       
       // Test 3: Rule 2 - Truncate by path components, not partial strings
       const pathComponents = 'path/to/some/plantuml/file.puml';
-      console.log('Testing path components with width 120:', pathComponents);
       const componentResult = window.truncateFilename(pathComponents, 180);
-      console.log('Component result:', componentResult);
-      
-      // Debug: let's also try with wider width to see what happens
-      const componentResultWide = window.truncateFilename(pathComponents, 200);
-      console.log('Component result with width 200:', componentResultWide);
-      
       tests.push({
         name: 'Rule 2: Truncate by path components',
         input: pathComponents,
