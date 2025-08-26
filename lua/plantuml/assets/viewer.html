@@ -106,7 +106,6 @@
       font-size: 1rem;
       white-space: nowrap;
       overflow: hidden;
-      text-overflow: ellipsis;
       text-align: center;
       max-width: 100%;
     }
@@ -296,15 +295,28 @@
     function updateFilenameDisplay() {
       if (window.currentFilename) {
         const filenameSection = document.querySelector('.filename-section');
-        const maxWidth = filenameSection.getBoundingClientRect().width - 20;
+        let maxWidth = filenameSection.getBoundingClientRect().width - 20;
+        
+        // Fallback for cases where layout isn't ready yet
+        if (maxWidth <= 0) {
+          maxWidth = Math.max(200, window.innerWidth * 0.5);
+        }
+        
         const truncatedFilename = truncateFilename(window.currentFilename, maxWidth);
         fileEl.textContent = truncatedFilename;
         fileEl.title = window.currentFilename;
       }
     }
 
+    function updateFilenameDisplaySafe() {
+      requestAnimationFrame(() => {
+        updateFilenameDisplay();
+      });
+    }
+
     window.updateFilenameDisplay = updateFilenameDisplay;
-    window.addEventListener('resize', updateFilenameDisplay);
+    window.updateFilenameDisplaySafe = updateFilenameDisplaySafe;
+    window.addEventListener('resize', updateFilenameDisplaySafe);
 
     board.addEventListener('click', () => {
       if (!hasLoadedDiagram) {
@@ -353,7 +365,7 @@
             img.style.opacity = 0;
             if (data.filename) {
               window.currentFilename = data.filename;
-              updateFilenameDisplay();
+              updateFilenameDisplaySafe();
             }
             if (data.timestamp) {
               timestampEl.textContent = "Updated: " + data.timestamp;

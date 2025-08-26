@@ -404,7 +404,70 @@ const { chromium } = require('playwright');
     
     console.log('✓ Filename successfully re-truncated on browser resize');
     
-    // Test 8: Take screenshot for verification
+    // Test 8: Test proper filename truncation without CSS ellipsis
+    console.log('Testing proper filename truncation without CSS ellipsis...');
+    
+    const truncationTest = await page.evaluate(() => {
+      const fileEl = document.getElementById('file');
+      const filenameSection = document.querySelector('.filename-section');
+      
+      // Test filename from the bug report
+      const longFilename = '/Users/charles/src/fi/firmware/src/fi/some_component.puml';
+      
+      // Set a width that should allow for some path but not the full path
+      filenameSection.style.width = '250px';
+      filenameSection.style.minWidth = '250px';
+      filenameSection.style.maxWidth = '250px';
+      
+      // Apply JavaScript truncation
+      window.currentFilename = longFilename;
+      updateFilenameDisplay();
+      
+      const result = fileEl.textContent;
+      const availableWidth = filenameSection.getBoundingClientRect().width - 20;
+      
+      return {
+        originalFilename: longFilename,
+        truncatedResult: result,
+        availableWidth: availableWidth,
+        isLeftTruncated: result.startsWith('...'),
+        isRightTruncated: result.endsWith('...') && !result.startsWith('...'),
+        filenamePreserved: result.endsWith('some_component.puml'),
+        hasProperTruncation: result.startsWith('...') && result.endsWith('some_component.puml'),
+        noCssEllipsis: getComputedStyle(fileEl).textOverflow !== 'ellipsis'
+      };
+    });
+    
+    console.log('Truncation test results:');
+    console.log('  Original:', truncationTest.originalFilename);
+    console.log('  Truncated:', truncationTest.truncatedResult);
+    console.log('  Available width:', truncationTest.availableWidth);
+    console.log('  CSS ellipsis removed:', truncationTest.noCssEllipsis);
+    console.log('  Left-truncated:', truncationTest.isLeftTruncated);
+    console.log('  Right-truncated:', truncationTest.isRightTruncated);
+    console.log('  Filename preserved:', truncationTest.filenamePreserved);
+    console.log('  Proper truncation:', truncationTest.hasProperTruncation);
+    
+    // Verify the fix
+    if (!truncationTest.noCssEllipsis) {
+      throw new Error('CSS text-overflow ellipsis still present - should be removed');
+    }
+    
+    if (truncationTest.isRightTruncated) {
+      throw new Error(`BUG STILL PRESENT: Right-truncated filename "${truncationTest.truncatedResult}" - should be left-truncated`);
+    }
+    
+    // The filename should either be properly left-truncated or fit completely
+    const isAcceptable = truncationTest.hasProperTruncation || 
+                         (truncationTest.truncatedResult === truncationTest.originalFilename);
+    
+    if (!isAcceptable) {
+      throw new Error(`Unexpected truncation result: "${truncationTest.truncatedResult}"`);
+    }
+    
+    console.log('✓ Filename truncation working correctly without CSS ellipsis');
+    
+    // Test 9: Take screenshot for verification
     await page.screenshot({ path: 'tests/screenshots/browser-ui-test.png' });
     console.log('✓ Screenshot saved');
     
