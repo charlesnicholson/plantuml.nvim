@@ -341,7 +341,8 @@ local function start_docker_server(callback)
             server.broadcast({
               type = "docker_status",
               operation = "container_reuse",
-              status = "Using existing Docker container"
+              status = "Using existing Docker container",
+              completed = true
             })
             callback(true, nil)
             return
@@ -453,7 +454,8 @@ local function start_docker_server(callback)
       server.broadcast({
         type = "docker_status",
         operation = "container_reuse",
-        status = "Using existing Docker container"
+        status = "Using existing Docker container",
+        completed = true
       })
     elseif status == "stopped" then
       vim.notify("[plantuml.nvim] Restarting PlantUML Docker container...", vim.log.levels.INFO)
