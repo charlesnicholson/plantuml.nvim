@@ -295,7 +295,13 @@
     function updateFilenameDisplay() {
       if (window.currentFilename) {
         const filenameSection = document.querySelector('.filename-section');
-        const maxWidth = filenameSection.getBoundingClientRect().width - 20;
+        let maxWidth = filenameSection.getBoundingClientRect().width - 20;
+        
+        // Fallback for cases where layout isn't ready yet
+        if (maxWidth <= 0) {
+          maxWidth = Math.max(200, window.innerWidth * 0.5);
+        }
+        
         const truncatedFilename = truncateFilename(window.currentFilename, maxWidth);
         fileEl.textContent = truncatedFilename;
         fileEl.title = window.currentFilename;
