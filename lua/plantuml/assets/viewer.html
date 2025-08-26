@@ -231,7 +231,7 @@
     const board = document.getElementById("board");
     let isFitToPage = true;
     let hasLoadedDiagram = false;
-    let currentFilename = "";
+    window.currentFilename = "";
 
     function setStatus(kind, text) {
       statusEl.className = 'pill';
@@ -294,14 +294,16 @@
     window.truncateFilename = truncateFilename;
 
     function updateFilenameDisplay() {
-      if (currentFilename) {
+      if (window.currentFilename) {
         const filenameSection = document.querySelector('.filename-section');
         const maxWidth = filenameSection.getBoundingClientRect().width - 20;
-        const truncatedFilename = truncateFilename(currentFilename, maxWidth);
+        const truncatedFilename = truncateFilename(window.currentFilename, maxWidth);
         fileEl.textContent = truncatedFilename;
-        fileEl.title = currentFilename;
+        fileEl.title = window.currentFilename;
       }
     }
+
+    window.updateFilenameDisplay = updateFilenameDisplay;
 
     window.addEventListener('resize', updateFilenameDisplay);
 
@@ -351,7 +353,7 @@
             setStatus("warn", "Reloading...");
             img.style.opacity = 0;
             if (data.filename) {
-              currentFilename = data.filename;
+              window.currentFilename = data.filename;
               updateFilenameDisplay();
             }
             if (data.timestamp) {

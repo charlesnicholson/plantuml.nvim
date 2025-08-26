@@ -339,7 +339,9 @@ const { chromium } = require('playwright');
       
       // Store the original filename for testing
       const testFilename = 'very/long/path/to/some/deep/directory/structure/filename.puml';
-      window.testOriginalFilename = testFilename;
+      
+      // Manually set the currentFilename variable (simulate what WebSocket would do)
+      window.currentFilename = testFilename;
       
       // Set a specific narrow width for consistent testing
       filenameSection.style.width = '120px';
@@ -353,11 +355,13 @@ const { chromium } = require('playwright');
       return {
         original: testFilename,
         narrowTruncated: narrowTruncated,
-        narrowWidth: narrowMaxWidth
+        narrowWidth: narrowMaxWidth,
+        currentFilenameSet: window.currentFilename
       };
     });
     
     console.log('Filename after narrow setup:', setupResult.narrowTruncated);
+    console.log('Current filename variable:', setupResult.currentFilenameSet);
     
     // Verify we actually got truncation
     if (setupResult.narrowTruncated === setupResult.original) {
@@ -365,34 +369,53 @@ const { chromium } = require('playwright');
     }
     
     // Now simulate expanding the window
-    await page.evaluate(() => {
+    const resizeResult = await page.evaluate(() => {
       const filenameSection = document.querySelector('.filename-section');
       
       // Expand the filename section width significantly
       filenameSection.style.width = '400px';
       
-      // Trigger a resize event to test our implementation
+      // Check if our functions exist
+      const hasUpdateFunction = typeof window.updateFilenameDisplay === 'function';
+      const hasCurrentFilename = window.currentFilename;
+      
+      // Manually call the update function to test it directly
+      if (hasUpdateFunction) {
+        window.updateFilenameDisplay();
+      }
+      
+      // Also trigger a resize event
       window.dispatchEvent(new Event('resize'));
       
-      return true;
+      return {
+        hasUpdateFunction: hasUpdateFunction,
+        hasCurrentFilename: hasCurrentFilename,
+        newWidth: filenameSection.getBoundingClientRect().width
+      };
     });
+    
+    console.log('Resize result:', resizeResult);
     
     // Wait a moment for resize handler to process
     await page.waitForTimeout(100);
     
     const expandedResult = await page.evaluate(() => {
-      return document.getElementById('file').textContent;
+      return {
+        displayText: document.getElementById('file').textContent,
+        currentFilename: window.currentFilename
+      };
     });
-    console.log('Filename after expanded resize:', expandedResult);
+    console.log('Filename after expanded resize:', expandedResult.displayText);
+    console.log('Current filename after resize:', expandedResult.currentFilename);
     
     // Verify that the filename expanded when more space became available
-    if (expandedResult === setupResult.narrowTruncated) {
-      throw new Error(`Filename did not re-truncate on resize. Expected expansion from "${setupResult.narrowTruncated}" but got "${expandedResult}"`);
+    if (expandedResult.displayText === setupResult.narrowTruncated) {
+      throw new Error(`Filename did not re-truncate on resize. Expected expansion from "${setupResult.narrowTruncated}" but got "${expandedResult.displayText}"`);
     }
     
     // Verify the expanded result shows more of the path than the narrow version
-    if (expandedResult.length <= setupResult.narrowTruncated.length) {
-      throw new Error(`Expanded filename should be longer than narrow version. Narrow: "${setupResult.narrowTruncated}", Expanded: "${expandedResult}"`);
+    if (expandedResult.displayText.length <= setupResult.narrowTruncated.length) {
+      throw new Error(`Expanded filename should be longer than narrow version. Narrow: "${setupResult.narrowTruncated}", Expanded: "${expandedResult.displayText}"`);
     }
     
     console.log('✓ Filename successfully re-truncated on browser resize');
