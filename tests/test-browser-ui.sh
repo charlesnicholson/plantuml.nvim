@@ -131,88 +131,94 @@ const { chromium } = require('playwright');
     console.log('Testing filename truncation behavior...');
     
     const truncationTests = await page.evaluate(() => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const fileEl = document.getElementById('file');
-      ctx.font = getComputedStyle(fileEl).font;
-      
-      function truncateFilename(fullPath, maxWidth) {
-        if (!fullPath) return '';
-        
-        if (ctx.measureText(fullPath).width <= maxWidth) {
-          return fullPath;
-        }
-        
-        const lastSlashIndex = fullPath.lastIndexOf('/');
-        if (lastSlashIndex === -1) {
-          return fullPath;
-        }
-        
-        const filename = fullPath.substring(lastSlashIndex + 1);
-        
-        if (ctx.measureText(filename).width <= maxWidth) {
-          for (let i = 1; i <= fullPath.length - filename.length; i++) {
-            const truncated = '...' + fullPath.substring(i);
-            if (ctx.measureText(truncated).width <= maxWidth) {
-              if (fullPath.substring(i).indexOf('/') === -1) {
-                return filename;
-              }
-              continue;
-            } else {
-              const prevTruncated = '...' + fullPath.substring(i - 1);
-              if (fullPath.substring(i - 1).indexOf('/') === -1) {
-                return filename;
-              }
-              return prevTruncated;
-            }
-          }
-          return filename;
-        }
-        
-        return filename;
+      // Use the actual truncateFilename function from the HTML page
+      if (typeof window.truncateFilename !== 'function') {
+        throw new Error('window.truncateFilename function not found on page');
       }
       
       const tests = [];
       
-      // Test 1: Short path that fits completely
+      // Test 1: Rule 1 - If the entire path and file fit, render the entire path and file
       const shortPath = 'test.puml';
-      const shortResult = truncateFilename(shortPath, 1000);
+      const shortResult = window.truncateFilename(shortPath, 1000);
       tests.push({
-        name: 'Short path fits completely',
+        name: 'Rule 1: Entire path fits',
         input: shortPath,
         expected: shortPath,
         actual: shortResult,
         passed: shortResult === shortPath
       });
       
-      // Test 2: Long path that needs truncation
-      const longPath = '/very/long/path/to/some/deep/directory/structure/filename.puml';
-      const longResult = truncateFilename(longPath, 100);
+      const fullPath = 'path/to/file.puml';
+      const fullResult = window.truncateFilename(fullPath, 1000);
       tests.push({
-        name: 'Long path truncation',
-        input: longPath,
-        actual: longResult,
-        passed: longResult.startsWith('...') || longResult === 'filename.puml'
+        name: 'Rule 1: Full path with directories fits',
+        input: fullPath,
+        expected: fullPath,
+        actual: fullResult,
+        passed: fullResult === fullPath
       });
       
-      // Test 3: Path where truncation reaches filename (should show filename without ellipses)
-      const mediumPath = '/Users/test/file.puml';
-      const mediumResult = truncateFilename(mediumPath, 80);
+      // Test 2: Rule 2 - If only part fits, truncate from left preserving filename
+      const longPath = 'very/long/path/to/some/deep/directory/structure/filename.puml';
+      const partialResult = window.truncateFilename(longPath, 200);
       tests.push({
-        name: 'Truncation reaches filename',
-        input: mediumPath,
-        actual: mediumResult,
-        passed: mediumResult === 'file.puml' || mediumResult.includes('file.puml')
+        name: 'Rule 2: Truncate from left preserving filename',
+        input: longPath,
+        actual: partialResult,
+        expected: 'Should start with ... and end with filename.puml (NOT filename-only)',
+        passed: partialResult.startsWith('...') && partialResult.endsWith('filename.puml') && partialResult !== 'filename.puml'
       });
       
-      // Test 4: Very narrow width forces filename only
-      const narrowResult = truncateFilename(longPath, 50);
+      // Test 3: Rule 2 - Truncate by path components, not partial strings
+      const pathComponents = 'path/to/some/plantuml/file.puml';
+      console.log('Testing path components with width 120:', pathComponents);
+      const componentResult = window.truncateFilename(pathComponents, 180);
+      console.log('Component result:', componentResult);
+      
+      // Debug: let's also try with wider width to see what happens
+      const componentResultWide = window.truncateFilename(pathComponents, 200);
+      console.log('Component result with width 200:', componentResultWide);
+      
       tests.push({
-        name: 'Very narrow width',
+        name: 'Rule 2: Truncate by path components',
+        input: pathComponents,
+        actual: componentResult,
+        expected: 'Should be .../plantuml/file.puml or similar complete path components (NOT filename-only)',
+        passed: (componentResult.startsWith('...') && componentResult.endsWith('file.puml') && 
+                componentResult !== 'file.puml' && !componentResult.includes('...tuml'))
+      });
+      
+      // Test 4: Rule 3 - If not enough space for path, show filename only without ellipses
+      const filenameOnlyResult = window.truncateFilename(longPath, 50);
+      tests.push({
+        name: 'Rule 3: Filename only when insufficient space',
         input: longPath,
-        actual: narrowResult,
         expected: 'filename.puml',
-        passed: narrowResult === 'filename.puml'
+        actual: filenameOnlyResult,
+        passed: filenameOnlyResult === 'filename.puml'
+      });
+      
+      // Test 5: Edge case - path without directories
+      const noDir = 'file.puml';
+      const noDirResult = window.truncateFilename(noDir, 30);
+      tests.push({
+        name: 'Edge case: No directories',
+        input: noDir,
+        expected: 'file.puml',
+        actual: noDirResult,
+        passed: noDirResult === 'file.puml'
+      });
+      
+      // Test 6: Edge case - very long filename that doesn't fit
+      const longFilename = 'very_long_filename_that_might_not_fit.puml';
+      const longFilenameResult = window.truncateFilename(longFilename, 30);
+      tests.push({
+        name: 'Edge case: Long filename',
+        input: longFilename,
+        expected: longFilename,
+        actual: longFilenameResult,
+        passed: longFilenameResult === longFilename
       });
       
       return tests;

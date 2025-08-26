@@ -275,23 +275,19 @@
         return filename;
       }
       
-      let bestTruncated = filename;
+      const pathParts = fullPath.split('/');
+      let bestResult = filename;
       
-      for (let i = 1; i < fullPath.length; i++) {
-        const remaining = fullPath.substring(i);
-        const truncated = '...' + remaining;
+      for (let startIndex = pathParts.length - 2; startIndex >= 1; startIndex--) {
+        const remainingParts = pathParts.slice(startIndex);
+        const candidate = '...' + '/' + remainingParts.join('/');
         
-        if (ctx.measureText(truncated).width <= maxWidth) {
-          if (remaining.indexOf('/') === -1) {
-            return filename;
-          }
-          bestTruncated = truncated;
-        } else {
-          break;
+        if (ctx.measureText(candidate).width <= maxWidth) {
+          bestResult = candidate;
         }
       }
       
-      return bestTruncated;
+      return bestResult;
     }
 
     window.truncateFilename = truncateFilename;
