@@ -254,6 +254,14 @@
       return img.naturalHeight <= boardRect.height;
     }
 
+    function isImageAtFullWidthOfBrowser() {
+      if (!img.naturalWidth || !img.naturalHeight) {
+        return false;
+      }
+      const boardRect = board.getBoundingClientRect();
+      return img.naturalWidth >= boardRect.width;
+    }
+
     function truncateFilename(fullPath, maxWidth) {
       if (!fullPath) return '';
       const canvas = document.createElement('canvas');
@@ -323,14 +331,17 @@
         return;
       }
       
-      if (isFitToPage && isImageAtNaturalSize()) {
+      // Rule 1: If image at natural size fits in browser, no clicking allowed
+      if (isImageAtNaturalSize()) {
         return;
       }
       
-      if (isFitToPage && !isImageAtNaturalSize() && img.naturalWidth > img.naturalHeight) {
+      // Rule 2: If image fills browser horizontally, no clicking allowed
+      if (isImageAtFullWidthOfBrowser()) {
         return;
       }
       
+      // Rule 3: Otherwise, allow toggling between fit-to-screen and fit-to-width
       isFitToPage = !isFitToPage;
       board.classList.toggle('fit-to-page', isFitToPage);
     });
