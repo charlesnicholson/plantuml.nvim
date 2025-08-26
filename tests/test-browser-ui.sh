@@ -404,7 +404,59 @@ const { chromium } = require('playwright');
     
     console.log('✓ Filename successfully re-truncated on browser resize');
     
-    // Test 8: Take screenshot for verification
+    // Test 8: Test initial filename load truncation (bug reproduction)
+    console.log('Testing initial filename load truncation behavior...');
+    
+    const initialLoadTest = await page.evaluate(() => {
+      const fileEl = document.getElementById('file');
+      const filenameSection = document.querySelector('.filename-section');
+      
+      // Clear current state
+      fileEl.textContent = '';
+      window.currentFilename = '';
+      
+      // Simulate a very long filename like in the bug report
+      const longFilename = '/Users/charles/src/fi/firmware/src/fi/some_component.puml';
+      
+      // Set current width to something reasonable (not too narrow, not too wide)
+      filenameSection.style.width = '300px';
+      
+      // Simulate what happens on initial load - set the filename and immediately display
+      window.currentFilename = longFilename;
+      updateFilenameDisplay();
+      
+      const displayedText = fileEl.textContent;
+      
+      return {
+        originalFilename: longFilename,
+        displayedText: displayedText,
+        // Check if it's properly left-truncated (starts with ...) vs right-truncated (ends with ...)
+        isLeftTruncated: displayedText.startsWith('...') && displayedText.endsWith('.puml'),
+        isRightTruncated: displayedText.endsWith('...') && !displayedText.startsWith('...'),
+        filenamePreserved: displayedText.endsWith('some_component.puml')
+      };
+    });
+    
+    console.log('Initial load test results:');
+    console.log('  Original:', initialLoadTest.originalFilename);
+    console.log('  Displayed:', initialLoadTest.displayedText);
+    console.log('  Left-truncated:', initialLoadTest.isLeftTruncated);
+    console.log('  Right-truncated:', initialLoadTest.isRightTruncated);
+    console.log('  Filename preserved:', initialLoadTest.filenamePreserved);
+    
+    // The bug is that it shows right-truncated text initially
+    // After fix, it should be left-truncated with filename preserved
+    if (initialLoadTest.isRightTruncated) {
+      throw new Error(`BUG REPRODUCED: Initial load shows right-truncated filename "${initialLoadTest.displayedText}" - should be left-truncated preserving filename`);
+    }
+    
+    if (!initialLoadTest.isLeftTruncated || !initialLoadTest.filenamePreserved) {
+      throw new Error(`Initial load filename truncation incorrect. Expected left-truncated with filename preserved, got: "${initialLoadTest.displayedText}"`);
+    }
+    
+    console.log('✓ Initial filename load shows correct left-truncation');
+    
+    // Test 9: Take screenshot for verification
     await page.screenshot({ path: 'tests/screenshots/browser-ui-test.png' });
     console.log('✓ Screenshot saved');
     
