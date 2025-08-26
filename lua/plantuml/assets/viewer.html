@@ -231,6 +231,7 @@
     const board = document.getElementById("board");
     let isFitToPage = true;
     let hasLoadedDiagram = false;
+    window.currentFilename = "";
 
     function setStatus(kind, text) {
       statusEl.className = 'pill';
@@ -292,6 +293,19 @@
 
     window.truncateFilename = truncateFilename;
 
+    function updateFilenameDisplay() {
+      if (window.currentFilename) {
+        const filenameSection = document.querySelector('.filename-section');
+        const maxWidth = filenameSection.getBoundingClientRect().width - 20;
+        const truncatedFilename = truncateFilename(window.currentFilename, maxWidth);
+        fileEl.textContent = truncatedFilename;
+        fileEl.title = window.currentFilename;
+      }
+    }
+
+    window.updateFilenameDisplay = updateFilenameDisplay;
+    window.addEventListener('resize', updateFilenameDisplay);
+
     board.addEventListener('click', () => {
       if (!hasLoadedDiagram) {
         return;
@@ -338,11 +352,8 @@
             setStatus("warn", "Reloading...");
             img.style.opacity = 0;
             if (data.filename) {
-              const filenameSection = document.querySelector('.filename-section');
-              const maxWidth = filenameSection.getBoundingClientRect().width - 20;
-              const truncatedFilename = truncateFilename(data.filename, maxWidth);
-              fileEl.textContent = truncatedFilename;
-              fileEl.title = data.filename;
+              window.currentFilename = data.filename;
+              updateFilenameDisplay();
             }
             if (data.timestamp) {
               timestampEl.textContent = "Updated: " + data.timestamp;

@@ -329,7 +329,82 @@ const { chromium } = require('playwright');
     }
     console.log('✓ Second click restored fit-to-page class');
     
-    // Test 7: Take screenshot for verification
+    // Test 7: Test filename re-truncation on browser resize
+    console.log('Testing filename re-truncation on browser resize...');
+    
+    // Set up a test filename and simulate a narrow window
+    const setupResult = await page.evaluate(() => {
+      const fileEl = document.getElementById('file');
+      const filenameSection = document.querySelector('.filename-section');
+      
+      // Store the original filename for testing
+      const testFilename = 'very/long/path/to/some/deep/directory/structure/filename.puml';
+      
+      // Manually set the currentFilename variable (simulate what WebSocket would do)
+      window.currentFilename = testFilename;
+      
+      // Set a specific narrow width for consistent testing
+      filenameSection.style.width = '120px';
+      
+      // Apply truncation with narrow width (force it to truncate significantly)
+      const narrowMaxWidth = 100; // Force a narrow width
+      const narrowTruncated = window.truncateFilename(testFilename, narrowMaxWidth);
+      fileEl.textContent = narrowTruncated;
+      fileEl.title = testFilename;
+      
+      return {
+        original: testFilename,
+        narrowTruncated: narrowTruncated,
+        narrowWidth: narrowMaxWidth
+      };
+    });
+    
+    console.log('Filename after narrow setup:', setupResult.narrowTruncated);
+    
+    // Verify we actually got truncation
+    if (setupResult.narrowTruncated === setupResult.original) {
+      throw new Error('Test setup failed: filename was not truncated in narrow width');
+    }
+    
+    // Now simulate expanding the window
+    await page.evaluate(() => {
+      const filenameSection = document.querySelector('.filename-section');
+      
+      // Expand the filename section width significantly
+      filenameSection.style.width = '400px';
+      
+      // Manually call the update function to test it directly
+      if (typeof window.updateFilenameDisplay === 'function') {
+        window.updateFilenameDisplay();
+      }
+      
+      // Also trigger a resize event
+      window.dispatchEvent(new Event('resize'));
+      
+      return true;
+    });
+    
+    // Wait a moment for resize handler to process
+    await page.waitForTimeout(100);
+    
+    const expandedResult = await page.evaluate(() => {
+      return document.getElementById('file').textContent;
+    });
+    console.log('Filename after expanded resize:', expandedResult);
+    
+    // Verify that the filename expanded when more space became available
+    if (expandedResult === setupResult.narrowTruncated) {
+      throw new Error(`Filename did not re-truncate on resize. Expected expansion from "${setupResult.narrowTruncated}" but got "${expandedResult}"`);
+    }
+    
+    // Verify the expanded result shows more of the path than the narrow version
+    if (expandedResult.length <= setupResult.narrowTruncated.length) {
+      throw new Error(`Expanded filename should be longer than narrow version. Narrow: "${setupResult.narrowTruncated}", Expanded: "${expandedResult}"`);
+    }
+    
+    console.log('✓ Filename successfully re-truncated on browser resize');
+    
+    // Test 8: Take screenshot for verification
     await page.screenshot({ path: 'tests/screenshots/browser-ui-test.png' });
     console.log('✓ Screenshot saved');
     
