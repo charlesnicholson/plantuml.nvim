@@ -166,6 +166,19 @@
       height: auto;
       max-width: 100%;
       max-height: 100%;
+      cursor: pointer;
+    }
+
+    .board.zoom-pan-mode {
+      overflow: visible;
+      cursor: move;
+    }
+
+    .board.zoom-pan-mode #img {
+      max-width: none;
+      max-height: none;
+      cursor: move;
+      transition: transform 0.1s ease-out;
     }
 
     .board.has-diagram #img {
@@ -212,6 +225,14 @@
     const board = document.getElementById("board");
     let hasLoadedDiagram = false;
     window.currentFilename = "";
+    
+    let isZoomPanMode = false;
+    let currentScale = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
 
     function setStatus(kind, text) {
       statusEl.className = 'pill';
@@ -283,6 +304,99 @@
     window.updateFilenameDisplaySafe = updateFilenameDisplaySafe;
     window.addEventListener('resize', updateFilenameDisplaySafe);
 
+    function isImageMinified() {
+      if (!img.naturalWidth || !img.naturalHeight) return false;
+      const boardRect = board.getBoundingClientRect();
+      const availableWidth = boardRect.width;
+      const availableHeight = boardRect.height;
+      
+      return img.naturalWidth > availableWidth || img.naturalHeight > availableHeight;
+    }
+
+    function resetZoomPan() {
+      isZoomPanMode = false;
+      currentScale = 1.0;
+      panX = 0;
+      panY = 0;
+      board.classList.remove('zoom-pan-mode');
+      updateImageTransform();
+    }
+
+    function enterZoomPanMode() {
+      isZoomPanMode = true;
+      currentScale = 0.8;
+      panX = 0;
+      panY = 0;
+      board.classList.add('zoom-pan-mode');
+      updateImageTransform();
+    }
+
+    function updateImageTransform() {
+      if (isZoomPanMode) {
+        img.style.transform = `scale(${currentScale}) translate(${panX}px, ${panY}px)`;
+        img.style.transformOrigin = 'center center';
+      } else {
+        img.style.transform = '';
+        img.style.transformOrigin = '';
+      }
+    }
+
+    function handleImageClick() {
+      if (!hasLoadedDiagram) return;
+      
+      if (isImageMinified()) {
+        if (isZoomPanMode) {
+          resetZoomPan();
+        } else {
+          enterZoomPanMode();
+        }
+      }
+    }
+
+    function handleMouseMove(e) {
+      if (!isZoomPanMode) return;
+      
+      const deltaX = e.clientX - lastMouseX;
+      const deltaY = e.clientY - lastMouseY;
+      
+      panX += deltaX / currentScale;
+      panY += deltaY / currentScale;
+      
+      updateImageTransform();
+      
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    }
+
+    function handleMouseDown(e) {
+      if (!isZoomPanMode) return;
+      
+      isPanning = true;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+      e.preventDefault();
+    }
+
+    function handleMouseUp() {
+      isPanning = false;
+    }
+
+    function handleWheel(e) {
+      if (!isZoomPanMode) return;
+      
+      e.preventDefault();
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      currentScale = Math.max(0.1, Math.min(3.0, currentScale * zoomFactor));
+      updateImageTransform();
+    }
+
+    img.addEventListener('click', handleImageClick);
+    board.addEventListener('mousemove', handleMouseMove);
+    board.addEventListener('mousedown', handleMouseDown);
+    board.addEventListener('mouseup', handleMouseUp);
+    board.addEventListener('wheel', handleWheel);
+    document.addEventListener('mouseup', handleMouseUp);
+
 
 
     function wsPort() {
@@ -310,6 +424,7 @@
             }
             setStatus("warn", "Reloading...");
             img.style.opacity = 0;
+            resetZoomPan();
             if (data.filename) {
               window.currentFilename = data.filename;
               updateFilenameDisplaySafe();
