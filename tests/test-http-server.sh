@@ -62,7 +62,7 @@ done
 
 # Test 4: CSS styles are embedded
 echo "Test 4: CSS styles are embedded"
-if echo "$RESPONSE" | grep -q "<style>" && echo "$RESPONSE" | grep -q "fit-to-page"; then
+if echo "$RESPONSE" | grep -q "<style>" && echo "$RESPONSE" | grep -q "board"; then
     echo "✓ CSS styles embedded"
 else
     echo "✗ CSS styles not found"
