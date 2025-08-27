@@ -228,11 +228,6 @@
     
     let isZoomPanMode = false;
     let currentScale = 1.0;
-    let panX = 0;
-    let panY = 0;
-    let isPanning = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
 
     function setStatus(kind, text) {
       statusEl.className = 'pill';
@@ -316,8 +311,6 @@
     function resetZoomPan() {
       isZoomPanMode = false;
       currentScale = 1.0;
-      panX = 0;
-      panY = 0;
       board.classList.remove('zoom-pan-mode');
       updateImageTransform();
     }
@@ -325,16 +318,13 @@
     function enterZoomPanMode() {
       isZoomPanMode = true;
       currentScale = 0.8;
-      panX = 0;
-      panY = 0;
       board.classList.add('zoom-pan-mode');
       updateImageTransform();
     }
 
     function updateImageTransform() {
       if (isZoomPanMode) {
-        img.style.transform = `scale(${currentScale}) translate(${panX}px, ${panY}px)`;
-        img.style.transformOrigin = 'center center';
+        img.style.transform = `scale(${currentScale})`;
       } else {
         img.style.transform = '';
         img.style.transformOrigin = '';
@@ -356,29 +346,20 @@
     function handleMouseMove(e) {
       if (!isZoomPanMode) return;
       
-      const deltaX = e.clientX - lastMouseX;
-      const deltaY = e.clientY - lastMouseY;
+      const boardRect = board.getBoundingClientRect();
+      const x = ((e.clientX - boardRect.left) / boardRect.width) * 100;
+      const y = ((e.clientY - boardRect.top) / boardRect.height) * 100;
       
-      panX += deltaX / currentScale;
-      panY += deltaY / currentScale;
-      
-      updateImageTransform();
-      
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
+      img.style.transformOrigin = `${x}% ${y}%`;
     }
 
     function handleMouseDown(e) {
       if (!isZoomPanMode) return;
-      
-      isPanning = true;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
       e.preventDefault();
     }
 
     function handleMouseUp() {
-      isPanning = false;
+      // No longer needed for this pan implementation
     }
 
     function handleWheel(e) {
@@ -393,9 +374,7 @@
     img.addEventListener('click', handleImageClick);
     board.addEventListener('mousemove', handleMouseMove);
     board.addEventListener('mousedown', handleMouseDown);
-    board.addEventListener('mouseup', handleMouseUp);
     board.addEventListener('wheel', handleWheel);
-    document.addEventListener('mouseup', handleMouseUp);
 
 
 
