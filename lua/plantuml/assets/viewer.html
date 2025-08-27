@@ -353,23 +353,11 @@
       const boardWidth = boardRect.width;
       const boardHeight = boardRect.height;
       
-      const renderedWidth = img.naturalWidth * currentScale;
-      const renderedHeight = img.naturalHeight * currentScale;
+      const normalizedX = mouseX / boardWidth;
+      const normalizedY = mouseY / boardHeight;
       
-      let originX = 50;
-      let originY = 50;
-      
-      if (renderedWidth > boardWidth) {
-        const maxPanX = (renderedWidth - boardWidth) / 2;
-        const panX = (mouseX / boardWidth) * maxPanX * 2 - maxPanX;
-        originX = 50 + (panX / renderedWidth) * 100;
-      }
-      
-      if (renderedHeight > boardHeight) {
-        const maxPanY = (renderedHeight - boardHeight) / 2;
-        const panY = (mouseY / boardHeight) * maxPanY * 2 - maxPanY;
-        originY = 50 + (panY / renderedHeight) * 100;
-      }
+      const originX = normalizedX * 100;
+      const originY = normalizedY * 100;
       
       img.style.transformOrigin = `${originX}% ${originY}%`;
     }
