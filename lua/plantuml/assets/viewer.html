@@ -347,10 +347,31 @@
       if (!isZoomPanMode) return;
       
       const boardRect = board.getBoundingClientRect();
-      const x = ((e.clientX - boardRect.left) / boardRect.width) * 100;
-      const y = ((e.clientY - boardRect.top) / boardRect.height) * 100;
+      const mouseX = e.clientX - boardRect.left;
+      const mouseY = e.clientY - boardRect.top;
       
-      img.style.transformOrigin = `${x}% ${y}%`;
+      const boardWidth = boardRect.width;
+      const boardHeight = boardRect.height;
+      
+      const renderedWidth = img.naturalWidth * currentScale;
+      const renderedHeight = img.naturalHeight * currentScale;
+      
+      let originX = 50;
+      let originY = 50;
+      
+      if (renderedWidth > boardWidth) {
+        const maxPanX = (renderedWidth - boardWidth) / 2;
+        const panX = (mouseX / boardWidth) * maxPanX * 2 - maxPanX;
+        originX = 50 + (panX / renderedWidth) * 100;
+      }
+      
+      if (renderedHeight > boardHeight) {
+        const maxPanY = (renderedHeight - boardHeight) / 2;
+        const panY = (mouseY / boardHeight) * maxPanY * 2 - maxPanY;
+        originY = 50 + (panY / renderedHeight) * 100;
+      }
+      
+      img.style.transformOrigin = `${originX}% ${originY}%`;
     }
 
     function handleMouseDown(e) {
