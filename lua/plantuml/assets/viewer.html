@@ -347,6 +347,8 @@
       if (!isZoomPanMode) return;
       
       const boardRect = board.getBoundingClientRect();
+      const imgRect = img.getBoundingClientRect();
+      
       const mouseX = e.clientX - boardRect.left;
       const mouseY = e.clientY - boardRect.top;
       
@@ -356,8 +358,16 @@
       const normalizedX = mouseX / boardWidth;
       const normalizedY = mouseY / boardHeight;
       
-      const originX = normalizedX * 100;
-      const originY = normalizedY * 100;
+      const imgWidth = imgRect.width;
+      const imgHeight = imgRect.height;
+      const imgLeft = imgRect.left - boardRect.left;
+      const imgTop = imgRect.top - boardRect.top;
+      
+      const imgRelativeX = (normalizedX * boardWidth - imgLeft) / imgWidth;
+      const imgRelativeY = (normalizedY * boardHeight - imgTop) / imgHeight;
+      
+      const originX = imgRelativeX * 100;
+      const originY = imgRelativeY * 100;
       
       img.style.transformOrigin = `${originX}% ${originY}%`;
     }
