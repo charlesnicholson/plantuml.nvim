@@ -233,6 +233,8 @@
 
     let isZoomPanMode = false;
     let currentScale = 1.0;
+    let panX = 0;
+    let panY = 0;
 
     function setStatus(kind, text) {
       statusEl.className = 'pill';
@@ -316,6 +318,8 @@
     function resetZoomPan() {
       isZoomPanMode = false;
       currentScale = 1.0;
+      panX = 0;
+      panY = 0;
       board.classList.remove('zoom-pan-mode');
       updateImageTransform();
     }
@@ -330,7 +334,7 @@
     function updateImageTransform() {
       if (isZoomPanMode) {
         const z = (img.naturalWidth * 0.8) / img.clientWidth;
-        img.style.transform = `scale(${z})`;
+        img.style.transform = `translate3D(${panX}%, ${panY}%, 0px) scale(${z})`;
       } else {
         img.style.transform = '';
       }
@@ -352,11 +356,9 @@
       if (!isZoomPanMode) return;
 
       const boardRect = board.getBoundingClientRect();
-      const nx = 50 - (((e.clientX - boardRect.left) / boardRect.width) * 100);
-      const ny = 50 - (((e.clientY - boardRect.top) / boardRect.height) * 100);
-      const z = (img.naturalWidth * 0.8) / img.clientWidth;
-      img.style.transform = `translate3D(${nx}%, ${ny}%, 0px) scale(${z})`;
-      console.log(img.style.transform);
+      panX = 50 - (((e.clientX - boardRect.left) / boardRect.width) * 100);
+      panY = 50 - (((e.clientY - boardRect.top) / boardRect.height) * 100);
+      updateImageTransform();
     }
 
     function handleMouseDown(e) {
