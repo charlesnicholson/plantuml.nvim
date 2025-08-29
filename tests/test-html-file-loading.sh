@@ -41,7 +41,7 @@ done
 echo "Test 4: Verify HTML file contains CSS styles"
 CSS_CLASSES="server-link timestamp filename-section status-section"
 for css_class in $CSS_CLASSES; do
-    if grep -q "\.$css_class{" "$HTML_FILE"; then
+    if grep -q "\.$css_class[ ]*{" "$HTML_FILE"; then
         echo "✓ CSS class '$css_class' found in HTML file"
     else
         echo "✗ CSS class '$css_class' not found in HTML file"

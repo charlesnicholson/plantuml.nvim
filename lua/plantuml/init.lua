@@ -131,10 +131,6 @@ end
 local html_content = nil
 
 local function load_html_content()
-  if html_content then
-    return html_content
-  end
-
   local current_file = debug.getinfo(1).source:sub(2)
   local plugin_dir = vim.fn.fnamemodify(current_file, ":h")
   local html_file = vim.fs.joinpath(plugin_dir, "assets", "viewer.html")
@@ -630,7 +626,7 @@ end
 
 function M.start()
   server.start()
-  
+
   if config.use_docker then
     start_docker_server(function(success, err)
       if not success then
@@ -644,7 +640,7 @@ function M.start()
       end
     end)
   end
-  
+
   return true
 end
 

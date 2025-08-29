@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -15,16 +16,17 @@
       --err: #be3431;
       --panel: #0f1013;
     }
-    
+
     * {
       box-sizing: border-box;
     }
-    
-    html, body {
+
+    html,
+    body {
       height: 100%;
       overflow: hidden;
     }
-    
+
     body {
       margin: 0;
       background: var(--bg);
@@ -33,7 +35,7 @@
       display: flex;
       flex-direction: column;
     }
-    
+
     .top {
       display: flex;
       align-items: center;
@@ -42,13 +44,13 @@
       border-bottom: 1px solid #111318;
       background: var(--panel);
     }
-    
-    .status-section{
+
+    .status-section {
       display: flex;
       align-items: center;
     }
-    
-    .filename-section{
+
+    .filename-section {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -57,13 +59,13 @@
       min-width: 0;
     }
 
-    .info-section{
+    .info-section {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
       gap: .25rem;
     }
-    
+
     .dot {
       width: .5rem;
       height: .5rem;
@@ -71,7 +73,7 @@
       display: inline-block;
       vertical-align: middle;
     }
-    
+
     .pill {
       display: inline-flex;
       align-items: center;
@@ -83,64 +85,62 @@
       font-size: .75rem;
       font-weight: 500;
     }
-    
+
     .pill .dot {
       background: var(--warn);
     }
-    
+
     .pill.ok .dot {
       background: var(--ok);
     }
-    
+
     .pill.err .dot {
       background: var(--err);
     }
-    
+
     .pill.warn .dot {
       background: var(--warn);
     }
-    
+
+    .file,
+    .server-link,
+    .timestamp {
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
     .file {
       color: var(--fg);
       font-weight: 600;
       font-size: 1rem;
-      white-space: nowrap;
-      overflow: hidden;
       text-align: center;
       max-width: 100%;
     }
-    
-    .server-link{
+
+    .server-link,
+    .timestamp {
       color: var(--muted);
       font-size: .75rem;
-      text-decoration: none;
-      white-space: nowrap;
-      overflow: hidden;
       text-overflow: ellipsis;
-      display: block;
       text-align: right;
     }
 
-    .server-link:hover{
+    .server-link {
+      text-decoration: none;
+      display: block;
+    }
+
+    .server-link:hover {
       color: var(--fg);
       text-decoration: underline;
     }
 
-    .timestamp{
-      color: var(--muted);
-      font-size: .75rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: right;
-    }
-    
     .wrap {
       flex: 1;
       min-height: 0;
       padding: 0.75rem;
     }
-    
+
     .board {
       position: relative;
       width: 100%;
@@ -153,10 +153,6 @@
       outline: 1px solid #111318;
       overflow: hidden;
     }
-    
-    .board.has-diagram {
-      align-items: center;
-    }
 
     #img {
       display: none;
@@ -166,12 +162,24 @@
       height: auto;
       max-width: 100%;
       max-height: 100%;
+      cursor: pointer;
+    }
+
+    .board.zoom-pan-mode {
+      cursor: move;
+    }
+
+    .board.zoom-pan-mode #img {
+      max-width: none;
+      max-height: none;
+      cursor: move;
+      transition: transform 0.1s ease-out;
     }
 
     .board.has-diagram #img {
       display: block;
     }
-    
+
     #ph {
       color: var(--muted);
       font-size: .9rem;
@@ -179,6 +187,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="top">
     <div class="status-section">
@@ -202,6 +211,12 @@
     </div>
   </div>
   <script>
+    const ZOOM_SCALE = 0.8;
+    const FALLBACK_WIDTH = 200;
+    const MAX_URL_DISPLAY = 70;
+    const DOCKER_STATUS_DELAY = 1500;
+    const RECONNECT_DELAY = 1000;
+    
     const statusEl = document.getElementById("status");
     const statusText = document.getElementById("status-text");
     const fileEl = document.getElementById("file");
@@ -212,6 +227,11 @@
     const board = document.getElementById("board");
     let hasLoadedDiagram = false;
     window.currentFilename = "";
+
+    let isZoomPanMode = false;
+    let currentScale = 1.0;
+    let panX = 0;
+    let panY = 0;
 
     function setStatus(kind, text) {
       statusEl.className = 'pill';
@@ -224,34 +244,34 @@
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       ctx.font = getComputedStyle(fileEl).font;
-      
+
       if (ctx.measureText(fullPath).width <= maxWidth) {
         return fullPath;
       }
-      
+
       const lastSlashIndex = fullPath.lastIndexOf('/');
       if (lastSlashIndex === -1) {
         return fullPath;
       }
-      
+
       const filename = fullPath.substring(lastSlashIndex + 1);
-      
+
       if (ctx.measureText(filename).width > maxWidth) {
         return filename;
       }
-      
+
       const pathParts = fullPath.split('/');
       let bestResult = filename;
-      
+
       for (let startIndex = pathParts.length - 2; startIndex >= 1; startIndex--) {
         const remainingParts = pathParts.slice(startIndex);
         const candidate = '...' + '/' + remainingParts.join('/');
-        
+
         if (ctx.measureText(candidate).width <= maxWidth) {
           bestResult = candidate;
         }
       }
-      
+
       return bestResult;
     }
 
@@ -261,29 +281,88 @@
       if (window.currentFilename) {
         const filenameSection = document.querySelector('.filename-section');
         let maxWidth = filenameSection.getBoundingClientRect().width - 20;
-        
-        // Fallback for cases where layout isn't ready yet
+
         if (maxWidth <= 0) {
-          maxWidth = Math.max(200, window.innerWidth * 0.5);
+          maxWidth = Math.max(FALLBACK_WIDTH, window.innerWidth * 0.5);
         }
-        
+
         const truncatedFilename = truncateFilename(window.currentFilename, maxWidth);
         fileEl.textContent = truncatedFilename;
         fileEl.title = window.currentFilename;
       }
     }
 
-    function updateFilenameDisplaySafe() {
-      requestAnimationFrame(() => {
-        updateFilenameDisplay();
-      });
+    window.truncateFilename = truncateFilename;
+    window.updateFilenameDisplay = updateFilenameDisplay;
+    window.addEventListener('resize', () => requestAnimationFrame(updateFilenameDisplay));
+
+    function isImageMinified() {
+      if (!img.naturalWidth || !img.naturalHeight) return false;
+      const boardRect = board.getBoundingClientRect();
+      const availableWidth = boardRect.width;
+      const availableHeight = boardRect.height;
+
+      return img.naturalWidth > availableWidth || img.naturalHeight > availableHeight;
     }
 
-    window.updateFilenameDisplay = updateFilenameDisplay;
-    window.updateFilenameDisplaySafe = updateFilenameDisplaySafe;
-    window.addEventListener('resize', updateFilenameDisplaySafe);
+    function resetZoomPan() {
+      isZoomPanMode = false;
+      currentScale = 1.0;
+      panX = 0;
+      panY = 0;
+      board.classList.remove('zoom-pan-mode');
+      updateImageTransform();
+    }
 
+    function enterZoomPanMode() {
+      isZoomPanMode = true;
+      currentScale = ZOOM_SCALE;
+      board.classList.add('zoom-pan-mode');
+      updateImageTransform();
+    }
 
+    function updateImageTransform() {
+      if (isZoomPanMode) {
+        const z = (img.naturalWidth * ZOOM_SCALE) / img.clientWidth;
+        img.style.transform = `translate3D(${panX}%, ${panY}%, 0px) scale(${z})`;
+      } else {
+        img.style.transform = '';
+      }
+    }
+
+    function updatePanFromMouseEvent(e) {
+      const boardRect = board.getBoundingClientRect();
+      panX = 50 - (((e.clientX - boardRect.left) / boardRect.width) * 100);
+      panY = 50 - (((e.clientY - boardRect.top) / boardRect.height) * 100);
+    }
+
+    function handleImageClick(e) {
+      if (!hasLoadedDiagram) return;
+
+      if (isImageMinified()) {
+        if (isZoomPanMode) {
+          resetZoomPan();
+        } else {
+          updatePanFromMouseEvent(e);
+          enterZoomPanMode();
+        }
+      }
+    }
+
+    function handleMouseMove(e) {
+      if (!isZoomPanMode) return;
+      updatePanFromMouseEvent(e);
+      updateImageTransform();
+    }
+
+    function handleMouseDown(e) {
+      if (!isZoomPanMode) return;
+      e.preventDefault();
+    }
+
+    img.addEventListener('click', handleImageClick);
+    board.addEventListener('mousemove', handleMouseMove);
+    board.addEventListener('mousedown', handleMouseDown);
 
     function wsPort() {
       const p = parseInt(location.port || "0", 10);
@@ -310,16 +389,17 @@
             }
             setStatus("warn", "Reloading...");
             img.style.opacity = 0;
+            resetZoomPan();
             if (data.filename) {
               window.currentFilename = data.filename;
-              updateFilenameDisplaySafe();
+              requestAnimationFrame(updateFilenameDisplay);
             }
             if (data.timestamp) {
               timestampEl.textContent = "Updated: " + data.timestamp;
               timestampEl.title = "Last update time";
             }
             if (data.url) {
-              serverUrlEl.textContent = data.url.length > 70 ? data.url.substring(0, 70) + "..." : data.url;
+              serverUrlEl.textContent = data.url.length > MAX_URL_DISPLAY ? data.url.substring(0, MAX_URL_DISPLAY) + "..." : data.url;
               serverUrlEl.href = data.url;
               serverUrlEl.title = "Click to open PlantUML diagram";
               serverUrlEl.style.display = "block";
@@ -331,12 +411,12 @@
             if (data.status) {
               const statusKind = data.error ? "err" : "warn";
               setStatus(statusKind, data.status);
-              
+
               // If Docker operation completed successfully, transition to Live after a brief delay
               if (data.completed && !data.error) {
                 setTimeout(() => {
                   setStatus("ok", "Live");
-                }, 1500);
+                }, DOCKER_STATUS_DELAY);
               }
             }
           }
@@ -347,7 +427,7 @@
 
       ws.onclose = () => {
         setStatus("err", "Reconnecting...");
-        setTimeout(connect, 1000);
+        setTimeout(connect, RECONNECT_DELAY);
       };
       ws.onerror = () => setStatus("err", "Error");
     }
@@ -362,4 +442,5 @@
     connect();
   </script>
 </body>
+
 </html>
