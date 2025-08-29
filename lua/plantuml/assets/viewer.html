@@ -102,39 +102,37 @@
       background: var(--warn);
     }
 
+    .file,
+    .server-link,
+    .timestamp {
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
     .file {
       color: var(--fg);
       font-weight: 600;
       font-size: 1rem;
-      white-space: nowrap;
-      overflow: hidden;
       text-align: center;
       max-width: 100%;
     }
 
-    .server-link {
+    .server-link,
+    .timestamp {
       color: var(--muted);
       font-size: .75rem;
-      text-decoration: none;
-      white-space: nowrap;
-      overflow: hidden;
       text-overflow: ellipsis;
-      display: block;
       text-align: right;
+    }
+
+    .server-link {
+      text-decoration: none;
+      display: block;
     }
 
     .server-link:hover {
       color: var(--fg);
       text-decoration: underline;
-    }
-
-    .timestamp {
-      color: var(--muted);
-      font-size: .75rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: right;
     }
 
     .wrap {
@@ -156,10 +154,6 @@
       overflow: hidden;
     }
 
-    .board.has-diagram {
-      align-items: center;
-    }
-
     #img {
       display: none;
       opacity: 0;
@@ -169,12 +163,10 @@
       max-width: 100%;
       max-height: 100%;
       cursor: pointer;
-      overflow: hidden;
     }
 
     .board.zoom-pan-mode {
       cursor: move;
-      overflow: hidden;
     }
 
     .board.zoom-pan-mode #img {
@@ -182,7 +174,6 @@
       max-height: none;
       cursor: move;
       transition: transform 0.1s ease-out;
-      overflow: hidden;
     }
 
     .board.has-diagram #img {
@@ -220,6 +211,12 @@
     </div>
   </div>
   <script>
+    const ZOOM_SCALE = 0.8;
+    const FALLBACK_WIDTH = 200;
+    const MAX_URL_DISPLAY = 70;
+    const DOCKER_STATUS_DELAY = 1500;
+    const RECONNECT_DELAY = 1000;
+    
     const statusEl = document.getElementById("status");
     const statusText = document.getElementById("status-text");
     const fileEl = document.getElementById("file");
@@ -285,9 +282,8 @@
         const filenameSection = document.querySelector('.filename-section');
         let maxWidth = filenameSection.getBoundingClientRect().width - 20;
 
-        // Fallback for cases where layout isn't ready yet
         if (maxWidth <= 0) {
-          maxWidth = Math.max(200, window.innerWidth * 0.5);
+          maxWidth = Math.max(FALLBACK_WIDTH, window.innerWidth * 0.5);
         }
 
         const truncatedFilename = truncateFilename(window.currentFilename, maxWidth);
@@ -296,15 +292,9 @@
       }
     }
 
-    function updateFilenameDisplaySafe() {
-      requestAnimationFrame(() => {
-        updateFilenameDisplay();
-      });
-    }
-
+    window.truncateFilename = truncateFilename;
     window.updateFilenameDisplay = updateFilenameDisplay;
-    window.updateFilenameDisplaySafe = updateFilenameDisplaySafe;
-    window.addEventListener('resize', updateFilenameDisplaySafe);
+    window.addEventListener('resize', () => requestAnimationFrame(updateFilenameDisplay));
 
     function isImageMinified() {
       if (!img.naturalWidth || !img.naturalHeight) return false;
@@ -326,14 +316,14 @@
 
     function enterZoomPanMode() {
       isZoomPanMode = true;
-      currentScale = 0.8;
+      currentScale = ZOOM_SCALE;
       board.classList.add('zoom-pan-mode');
       updateImageTransform();
     }
 
     function updateImageTransform() {
       if (isZoomPanMode) {
-        const z = (img.naturalWidth * 0.8) / img.clientWidth;
+        const z = (img.naturalWidth * ZOOM_SCALE) / img.clientWidth;
         img.style.transform = `translate3D(${panX}%, ${panY}%, 0px) scale(${z})`;
       } else {
         img.style.transform = '';
@@ -402,14 +392,14 @@
             resetZoomPan();
             if (data.filename) {
               window.currentFilename = data.filename;
-              updateFilenameDisplaySafe();
+              requestAnimationFrame(updateFilenameDisplay);
             }
             if (data.timestamp) {
               timestampEl.textContent = "Updated: " + data.timestamp;
               timestampEl.title = "Last update time";
             }
             if (data.url) {
-              serverUrlEl.textContent = data.url.length > 70 ? data.url.substring(0, 70) + "..." : data.url;
+              serverUrlEl.textContent = data.url.length > MAX_URL_DISPLAY ? data.url.substring(0, MAX_URL_DISPLAY) + "..." : data.url;
               serverUrlEl.href = data.url;
               serverUrlEl.title = "Click to open PlantUML diagram";
               serverUrlEl.style.display = "block";
@@ -426,7 +416,7 @@
               if (data.completed && !data.error) {
                 setTimeout(() => {
                   setStatus("ok", "Live");
-                }, 1500);
+                }, DOCKER_STATUS_DELAY);
               }
             }
           }
@@ -437,7 +427,7 @@
 
       ws.onclose = () => {
         setStatus("err", "Reconnecting...");
-        setTimeout(connect, 1000);
+        setTimeout(connect, RECONNECT_DELAY);
       };
       ws.onerror = () => setStatus("err", "Error");
     }
