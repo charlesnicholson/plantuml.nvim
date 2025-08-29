@@ -78,19 +78,19 @@ const { chromium } = require('playwright');
     
     // Test 2.6: Check for current layout styling in CSS
     const pageContent = await page.content();
-    if (!pageContent.includes('.server-link{')) {
+    if (!pageContent.includes('.server-link {')) {
       throw new Error('Server-link class styling not found in CSS');
     }
-    if (!pageContent.includes('.timestamp{')) {
+    if (!pageContent.includes('.timestamp {')) {
       throw new Error('Timestamp class styling not found in CSS');
     }
-    if (!pageContent.includes('.filename-section{')) {
+    if (!pageContent.includes('.filename-section {')) {
       throw new Error('Filename-section class styling not found in CSS');
     }
-    if (!pageContent.includes('.status-section{')) {
+    if (!pageContent.includes('.status-section {')) {
       throw new Error('Status-section class styling not found in CSS');
     }
-    if (!pageContent.includes('.info-section{')) {
+    if (!pageContent.includes('.info-section {')) {
       throw new Error('Info-section class styling not found in CSS');
     }
     console.log('✓ Current layout styling found in CSS');
