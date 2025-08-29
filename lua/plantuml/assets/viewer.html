@@ -340,13 +340,20 @@
       }
     }
 
-    function handleImageClick() {
+    function updatePanFromMouseEvent(e) {
+      const boardRect = board.getBoundingClientRect();
+      panX = 50 - (((e.clientX - boardRect.left) / boardRect.width) * 100);
+      panY = 50 - (((e.clientY - boardRect.top) / boardRect.height) * 100);
+    }
+
+    function handleImageClick(e) {
       if (!hasLoadedDiagram) return;
 
       if (isImageMinified()) {
         if (isZoomPanMode) {
           resetZoomPan();
         } else {
+          updatePanFromMouseEvent(e);
           enterZoomPanMode();
         }
       }
@@ -354,10 +361,7 @@
 
     function handleMouseMove(e) {
       if (!isZoomPanMode) return;
-
-      const boardRect = board.getBoundingClientRect();
-      panX = 50 - (((e.clientX - boardRect.left) / boardRect.width) * 100);
-      panY = 50 - (((e.clientY - boardRect.top) / boardRect.height) * 100);
+      updatePanFromMouseEvent(e);
       updateImageTransform();
     }
 
