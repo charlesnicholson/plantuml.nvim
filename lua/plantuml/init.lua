@@ -630,7 +630,7 @@ function M.start()
   if config.use_docker then
     start_docker_server(function(success, err)
       if not success then
-        vim.notify(err, vim.log.levels.ERROR)
+        vim.notify("[plantuml.nvim] Docker is not running", vim.log.levels.WARN)
         server.broadcast({
           type = "docker_status",
           operation = "error",
