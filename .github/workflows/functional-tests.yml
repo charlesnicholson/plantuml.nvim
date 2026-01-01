@@ -10,14 +10,14 @@ jobs:
   functional-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      
+
     - name: Setup Docker
-      uses: docker/setup-docker-action@v3
-      
+      uses: docker/setup-docker-action@v4
+
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -28,38 +28,38 @@ jobs:
           xvfb \
           nodejs \
           npm
-          
+
     - name: Install Neovim
       run: |
         # Add Neovim PPA for latest version
         sudo add-apt-repository ppa:neovim-ppa/unstable -y
         sudo apt-get update
         sudo apt-get install -y neovim
-        
+
         # Verify installation
         nvim --version
-        
+
     - name: Verify Neovim installation
       run: |
         nvim --version
         which nvim
         # Ensure Neovim is working properly
         nvim --headless -c "echo 'Neovim is working'" -c "qall!"
-        
+
     - name: Install Playwright
       run: |
         npm install
         npx playwright install chromium --with-deps
-        
+
     - name: Start virtual display for browser tests
       run: |
         export DISPLAY=:99
         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
         echo "DISPLAY=:99" >> $GITHUB_ENV
-        
+
     - name: Run all functional tests
       run: ./tests/run-all-tests.sh
-        
+
     - name: Upload test artifacts
       if: failure()
       uses: actions/upload-artifact@v4
