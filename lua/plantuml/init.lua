@@ -152,12 +152,43 @@ end
 
 local server = {}
 local connected_clients = {}
-local started = false
 local browser_launched_this_session = false
 local last_message = nil
 local http_server = nil
 local ws_server = nil
 local docker_container_name = "plantuml-nvim"
+
+-- State machine: STOPPED -> STARTING -> DOCKER_PENDING -> READY
+-- Also: STOPPING -> STOPPED
+-- Also: DOCKER_UNAVAILABLE (Docker daemon not running, polling for it)
+local STATE = {
+  STOPPED = "stopped",
+  STARTING = "starting",
+  DOCKER_PENDING = "docker_pending",
+  DOCKER_UNAVAILABLE = "docker_unavailable",
+  READY = "ready",
+  STOPPING = "stopping",
+}
+local current_state = STATE.STOPPED
+local docker_poll_timer = nil
+
+local function set_state(new_state)
+  current_state = new_state
+  -- Broadcast state change to all clients
+  server.broadcast_status()
+end
+
+local function is_ready()
+  return current_state == STATE.READY
+end
+
+local function stop_docker_polling()
+  if docker_poll_timer then
+    docker_poll_timer:stop()
+    docker_poll_timer:close()
+    docker_poll_timer = nil
+  end
+end
 
 local function encode_ws_frame(payload)
   local len = #payload
@@ -211,88 +242,217 @@ local function decode_ws_frame(data)
   end
 end
 
-function server.broadcast(tbl)
-  last_message = tbl
-  local frame = encode_ws_frame(vim.json.encode(tbl))
-  for client, _ in pairs(connected_clients) do
-    if client and not client:is_closing() then
-      client:write(frame)
-    else
-      connected_clients[client] = nil
+local function safe_client_write(client, frame)
+  if client and not client:is_closing() then
+    local ok, err = pcall(function() client:write(frame) end)
+    if not ok then
+      return false
     end
-  end
-end
-
-local function has_connected_clients()
-  for client, _ in pairs(connected_clients) do
-    if client and not client:is_closing() then
-      return true
-    else
-      connected_clients[client] = nil
-    end
+    return true
   end
   return false
 end
 
+local function collect_dead_clients()
+  local dead = {}
+  for client, _ in pairs(connected_clients) do
+    if not client or client:is_closing() then
+      dead[#dead + 1] = client
+    end
+  end
+  return dead
+end
+
+local function remove_dead_clients()
+  for _, client in ipairs(collect_dead_clients()) do
+    connected_clients[client] = nil
+  end
+end
+
+function server.broadcast(tbl)
+  if tbl.type == "update" then
+    last_message = tbl
+  end
+  local frame = encode_ws_frame(vim.json.encode(tbl))
+  local dead = {}
+  for client, _ in pairs(connected_clients) do
+    if not safe_client_write(client, frame) then
+      dead[#dead + 1] = client
+    end
+  end
+  for _, client in ipairs(dead) do
+    connected_clients[client] = nil
+  end
+end
+
+function server.broadcast_status()
+  local status_msg = {
+    type = "status",
+    state = current_state,
+    has_diagram = last_message ~= nil,
+  }
+  -- Add helpful message for docker_unavailable state
+  if current_state == STATE.DOCKER_UNAVAILABLE then
+    status_msg.message = "Docker daemon is not running. Start Docker to enable local rendering."
+  end
+  local frame = encode_ws_frame(vim.json.encode(status_msg))
+  local dead = {}
+  for client, _ in pairs(connected_clients) do
+    if not safe_client_write(client, frame) then
+      dead[#dead + 1] = client
+    end
+  end
+  for _, client in ipairs(dead) do
+    connected_clients[client] = nil
+  end
+end
+
+local function send_current_state(client)
+  -- Always respond to refresh with current state
+  local response
+  if last_message then
+    response = last_message
+  else
+    response = {
+      type = "status",
+      state = current_state,
+      has_diagram = false,
+    }
+  end
+  local frame = encode_ws_frame(vim.json.encode(response))
+  safe_client_write(client, frame)
+end
+
+local function has_connected_clients()
+  remove_dead_clients()
+  return next(connected_clients) ~= nil
+end
+
+local function handle_health_request(client)
+  local health = {
+    state = current_state,
+    has_diagram = last_message ~= nil,
+    connected_clients = 0,
+  }
+  for _ in pairs(connected_clients) do
+    health.connected_clients = health.connected_clients + 1
+  end
+  local json = vim.json.encode(health)
+  local response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " ..
+      #json .. "\r\n\r\n" .. json
+  client:write(response, function() client:close() end)
+end
+
 function server.start()
-  if started then return end
-  started = true
+  if current_state ~= STATE.STOPPED then return false, "Server already running" end
+  set_state(STATE.STARTING)
 
   http_server = vim.loop.new_tcp()
-  http_server:bind("127.0.0.1", config.http_port)
-  http_server:listen(128, function(err)
-    assert(not err, err)
-    local client = vim.loop.new_tcp()
-    http_server:accept(client)
-    client:read_start(function(_, data)
-      if data then
-        local content = load_html_content()
-        local response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " ..
-            #content .. "\r\n\r\n" .. content
-        client:write(response, function() client:close() end)
-      end
-    end)
+  local ok, err = pcall(function()
+    http_server:bind("127.0.0.1", config.http_port)
   end)
+  if not ok then
+    set_state(STATE.STOPPED)
+    return false, "Failed to bind HTTP server: " .. tostring(err)
+  end
 
-  ws_server = vim.loop.new_tcp()
-  ws_server:bind("127.0.0.1", config.http_port + 1)
-  ws_server:listen(128, function(err)
-    assert(not err, err)
-    local client = vim.loop.new_tcp()
-    ws_server:accept(client)
-    local handshake_done = false
-    client:read_start(function(err2, data)
-      if err2 or not data then
-        connected_clients[client] = nil; client:close(); return
-      end
-      vim.schedule(function()
-        if not handshake_done then
-          local key = data:match("Sec%-WebSocket%-Key: ([%w%+/=]+)")
-          if key then
-            local guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-            local accept_key_b64 = b64(sha1(key .. guid))
-            local response =
-                "HTTP/1.1 101 Switching Protocols\r\n" ..
-                "Upgrade: websocket\r\n" ..
-                "Connection: Upgrade\r\n" ..
-                "Sec-WebSocket-Accept: " .. accept_key_b64 .. "\r\n\r\n"
-            client:write(response)
-            connected_clients[client] = true
-            handshake_done = true
-          end
-        else
-          local payload = decode_ws_frame(data)
-          if payload then
-            local ok, message = pcall(vim.json.decode, payload)
-            if ok and message and message.type == "refresh" and last_message then
-              local frame = encode_ws_frame(vim.json.encode(last_message))
-              client:write(frame)
+  local ok2, err2 = pcall(function()
+    http_server:listen(128, function(listen_err)
+      if listen_err then return end
+      local client = vim.loop.new_tcp()
+      http_server:accept(client)
+      local http_buffer = ""
+      client:read_start(function(_, data)
+        if data then
+          http_buffer = http_buffer .. data
+          -- Check if we have complete HTTP request
+          if http_buffer:find("\r\n\r\n") then
+            -- Check for health endpoint - simple string search in first line
+            local first_line = http_buffer:match("^([^\r\n]+)")
+            local is_health = first_line and first_line:find("/health", 1, true)
+            if is_health then
+              handle_health_request(client)
+            else
+              local content = load_html_content()
+              local response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " ..
+                  #content .. "\r\n\r\n" .. content
+              client:write(response, function() client:close() end)
             end
           end
         end
       end)
     end)
   end)
+  if not ok2 then
+    set_state(STATE.STOPPED)
+    return false, "Failed to start HTTP server: " .. tostring(err2)
+  end
+
+  ws_server = vim.loop.new_tcp()
+  local ok3, err3 = pcall(function()
+    ws_server:bind("127.0.0.1", config.http_port + 1)
+  end)
+  if not ok3 then
+    http_server:close()
+    set_state(STATE.STOPPED)
+    return false, "Failed to bind WebSocket server: " .. tostring(err3)
+  end
+
+  local ok4, err4 = pcall(function()
+    ws_server:listen(128, function(listen_err)
+      if listen_err then return end
+      local client = vim.loop.new_tcp()
+      ws_server:accept(client)
+      local handshake_done = false
+      local handshake_buffer = ""
+      client:read_start(function(read_err, data)
+        if read_err or not data then
+          connected_clients[client] = nil
+          pcall(function() client:close() end)
+          return
+        end
+        vim.schedule(function()
+          if not handshake_done then
+            -- Buffer handshake data until we have complete headers
+            handshake_buffer = handshake_buffer .. data
+            if not handshake_buffer:find("\r\n\r\n") then
+              return -- Wait for more data
+            end
+            local key = handshake_buffer:match("Sec%-WebSocket%-Key: ([%w%+/=]+)")
+            if key then
+              local guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+              local accept_key_b64 = b64(sha1(key .. guid))
+              local response =
+                  "HTTP/1.1 101 Switching Protocols\r\n" ..
+                  "Upgrade: websocket\r\n" ..
+                  "Connection: Upgrade\r\n" ..
+                  "Sec-WebSocket-Accept: " .. accept_key_b64 .. "\r\n\r\n"
+              client:write(response)
+              connected_clients[client] = true
+              handshake_done = true
+              handshake_buffer = nil -- Free memory
+            end
+          else
+            local payload = decode_ws_frame(data)
+            if payload then
+              local ok, message = pcall(vim.json.decode, payload)
+              if ok and message and message.type == "refresh" then
+                send_current_state(client)
+              end
+            end
+          end
+        end)
+      end)
+    end)
+  end)
+  if not ok4 then
+    http_server:close()
+    ws_server:close()
+    set_state(STATE.STOPPED)
+    return false, "Failed to start WebSocket server: " .. tostring(err4)
+  end
+
+  return true
 end
 
 local function start_docker_server(callback)
@@ -586,6 +746,11 @@ end
 local M = {}
 
 function M.update_diagram()
+  -- Only broadcast updates when ready (or if not using Docker)
+  if current_state ~= STATE.READY and current_state ~= STATE.STARTING then
+    return
+  end
+
   local buf = 0
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local buffer_content = table.concat(lines, '\n')
@@ -614,7 +779,7 @@ function M.update_diagram()
     server_url = server_url
   })
 
-  if not has_connected_clients() and started then
+  if not has_connected_clients() and current_state ~= STATE.STOPPED then
     if config.auto_launch_browser == "always" then
       M.open_browser()
     elseif config.auto_launch_browser == "once" and not browser_launched_this_session then
@@ -624,35 +789,97 @@ function M.update_diagram()
   end
 end
 
-function M.start()
-  server.start()
+-- Try to start Docker, called from polling or initial startup
+local function try_start_docker()
+  if current_state == STATE.STOPPED or current_state == STATE.STOPPING then
+    stop_docker_polling()
+    return
+  end
 
-  if config.use_docker then
-    start_docker_server(function(success, err)
-      if not success then
-        vim.notify("[plantuml.nvim] Docker is not running", vim.log.levels.WARN)
-        if err then
-          vim.notify(err, vim.log.levels.DEBUG)
-        end
-        server.broadcast({
-          type = "docker_status",
-          operation = "error",
-          status = "Docker startup failed",
-          error = true
-        })
+  -- Check if Docker daemon is running
+  docker.is_docker_running(function(running, _)
+    if not running then
+      -- Docker still not running, keep polling (state already DOCKER_UNAVAILABLE)
+      return
+    end
+
+    -- Docker is now running! Stop polling and start the container
+    stop_docker_polling()
+    set_state(STATE.DOCKER_PENDING)
+
+    -- Now try to start the container
+    start_docker_server(function(success, _)
+      if success then
+        set_state(STATE.READY)
+      else
+        -- Container failed but Docker is running - still go to READY
+        -- (user can use remote server)
+        set_state(STATE.READY)
       end
     end)
+  end)
+end
+
+-- Start polling for Docker daemon at 1Hz
+local function start_docker_polling()
+  stop_docker_polling() -- Clean up any existing timer
+
+  docker_poll_timer = vim.loop.new_timer()
+  docker_poll_timer:start(1000, 1000, vim.schedule_wrap(function()
+    if current_state == STATE.DOCKER_UNAVAILABLE then
+      try_start_docker()
+    else
+      stop_docker_polling()
+    end
+  end))
+end
+
+function M.start()
+  local ok, err = server.start()
+  if not ok then
+    vim.notify("[plantuml.nvim] " .. (err or "Failed to start server"), vim.log.levels.ERROR)
+    return false
+  end
+
+  if config.use_docker then
+    -- First check if Docker daemon is even running (synchronously for quick feedback)
+    docker.is_docker_running(function(running, _)
+      if not running then
+        -- Docker daemon not running - go to DOCKER_UNAVAILABLE state and poll
+        set_state(STATE.DOCKER_UNAVAILABLE)
+        start_docker_polling()
+        return
+      end
+
+      -- Docker is running, proceed with normal startup
+      set_state(STATE.DOCKER_PENDING)
+      start_docker_server(function(success, _)
+        if success then
+          set_state(STATE.READY)
+        else
+          -- Container start failed but daemon is running
+          -- Go to READY so plugin is usable with remote server
+          set_state(STATE.READY)
+        end
+      end)
+    end)
+  else
+    set_state(STATE.READY)
   end
 
   return true
 end
 
 function M.is_running()
-  return started
+  return current_state ~= STATE.STOPPED
+end
+
+function M.get_state()
+  return current_state
 end
 
 function M.open_browser()
-  if not started then
+  if current_state == STATE.STOPPED then
     vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
     return
   end
@@ -662,30 +889,40 @@ function M.open_browser()
 end
 
 function M.stop()
-  if not started then
+  if current_state == STATE.STOPPED then
     vim.notify("[plantuml.nvim] Server is not running.", vim.log.levels.WARN)
     return
   end
-  started = false
+  set_state(STATE.STOPPING)
 
+  -- Stop Docker polling if active
+  stop_docker_polling()
+
+  -- Collect clients to close (don't modify during iteration)
+  local clients_to_close = {}
   for client, _ in pairs(connected_clients) do
+    clients_to_close[#clients_to_close + 1] = client
+  end
+  for _, client in ipairs(clients_to_close) do
     if client and not client:is_closing() then
-      client:close()
+      pcall(function() client:close() end)
     end
   end
   connected_clients = {}
 
   if http_server and not http_server:is_closing() then
-    http_server:close()
+    pcall(function() http_server:close() end)
   end
   if ws_server and not ws_server:is_closing() then
-    ws_server:close()
+    pcall(function() ws_server:close() end)
   end
 
   if config.use_docker then
     stop_docker_server()
   end
 
+  set_state(STATE.STOPPED)
+  last_message = nil
   vim.notify("[plantuml.nvim] Server stopped.", vim.log.levels.INFO)
 end
 
