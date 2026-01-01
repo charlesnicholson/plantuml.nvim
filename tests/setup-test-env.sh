@@ -3,29 +3,9 @@ set -euo pipefail
 
 echo "Setting up test environment..."
 
-# Only create screenshots directory (for actual screenshot output)
-# Log directories are now created by individual test scripts as temporary directories
+# Create directories for test output
 mkdir -p tests/screenshots
-
-# Create Neovim config directory for testing
-mkdir -p ~/.config/nvim
-
-# Create minimal init.lua for testing
-cat > ~/.config/nvim/init.lua << 'EOF'
--- Minimal Neovim config for testing plantuml.nvim
-vim.opt.runtimepath:prepend(vim.fn.getcwd())
-
--- Disable plugin auto-loading to prevent conflicts
-vim.g.loaded_plantuml = 1
-
--- Setup filetype detection
-vim.filetype.add({
-  extension = {
-    puml = 'plantuml',
-    plantuml = 'plantuml',
-  },
-})
-EOF
+mkdir -p tests/fixtures
 
 # Create test PlantUML file
 cat > tests/fixtures/test.puml << 'EOF'

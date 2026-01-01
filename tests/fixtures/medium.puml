@@ -1,0 +1,8 @@
+@startuml
+!theme plain
+skinparam monochrome true
+participant Alice
+participant Bob
+Alice -> Bob: Request
+Bob -> Alice: Response
+@enduml

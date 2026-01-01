@@ -1,37 +1,33 @@
 #!/bin/bash
 set -euo pipefail
 
-
+# Source test utilities
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/test-utils.sh"
 
 echo "Testing HTTP server..."
 
-# Start Neovim with plugin in background
+# Setup isolated test environment
+setup_test_env
+
+# Start Neovim with plugin in background (clean mode, only local plugin)
 echo "Starting Neovim with plugin..."
-nvim --headless -u ~/.config/nvim/init.lua -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" &
+nvim --headless --clean \
+    -c "lua vim.opt.runtimepath:prepend('$PLUGIN_DIR')" \
+    -c "lua package.loaded.plantuml = nil; package.loaded['plantuml.docker'] = nil" \
+    -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = $TEST_HTTP_PORT}); p.start()" &
 NVIM_PID=$!
+track_pid "$NVIM_PID"
 
-# Wait for server to be ready
-echo "Waiting for server to be ready..."
-for i in {1..10}; do
-    if netstat -tuln 2>/dev/null | grep -q "127.0.0.1:8764"; then
-        echo "HTTP server is listening"
-        break
-    fi
-    echo "Waiting for HTTP server to start (attempt $i/10)..."
-    sleep 1
-done
-
-# Cleanup function
-cleanup() {
-    echo "Cleaning up..."
-    kill $NVIM_PID 2>/dev/null || true
-    wait $NVIM_PID 2>/dev/null || true
-}
-trap cleanup EXIT
+# Wait for health endpoint to report ready
+if ! wait_for_health 10; then
+    echo "✗ Server failed to become ready"
+    exit 1
+fi
 
 # Test 1: HTTP server responds on correct port
-echo "Test 1: HTTP server responds on port 8764"
-if curl -f -s "http://127.0.0.1:8764" > /dev/null; then
+echo "Test 1: HTTP server responds on port $TEST_HTTP_PORT"
+if curl -f -s "http://127.0.0.1:$TEST_HTTP_PORT" > /dev/null; then
     echo "✓ HTTP server responding"
 else
     echo "✗ HTTP server not responding"
@@ -40,7 +36,7 @@ fi
 
 # Test 2: Server returns HTML content
 echo "Test 2: Server returns HTML content"
-RESPONSE=$(curl -s "http://127.0.0.1:8764")
+RESPONSE=$(curl -s "http://127.0.0.1:$TEST_HTTP_PORT")
 if echo "$RESPONSE" | grep -q "<!doctype html>"; then
     echo "✓ HTML content returned"
 else
@@ -80,7 +76,7 @@ fi
 
 # Test 6: Content-Type header is correct
 echo "Test 6: Content-Type header is correct"
-HEADERS=$(curl -I -s "http://127.0.0.1:8764")
+HEADERS=$(curl -I -s "http://127.0.0.1:$TEST_HTTP_PORT")
 if echo "$HEADERS" | grep -q "Content-Type: text/html"; then
     echo "✓ Content-Type header correct"
 else
@@ -94,6 +90,16 @@ if echo "$HEADERS" | grep -q "Content-Length:"; then
     echo "✓ Content-Length header present"
 else
     echo "✗ Content-Length header missing"
+    exit 1
+fi
+
+# Test 8: Health endpoint works
+echo "Test 8: Health endpoint returns JSON"
+HEALTH=$(curl -s "http://127.0.0.1:$TEST_HTTP_PORT/health")
+if echo "$HEALTH" | grep -q '"state"'; then
+    echo "✓ Health endpoint returns state"
+else
+    echo "✗ Health endpoint invalid"
     exit 1
 fi
 

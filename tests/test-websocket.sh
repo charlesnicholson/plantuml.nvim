@@ -1,61 +1,68 @@
 #!/bin/bash
 set -euo pipefail
 
-
+# Source test utilities
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/test-utils.sh"
 
 echo "Testing WebSocket server..."
 
-# Start Neovim with plugin in background
+# Setup isolated test environment
+setup_test_env
+
+# Start Neovim with plugin (clean mode, only local plugin)
 echo "Starting Neovim with plugin..."
-nvim --headless -u ~/.config/nvim/init.lua -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" &
+nvim --headless --clean \
+    -c "lua vim.opt.runtimepath:prepend('$PLUGIN_DIR')" \
+    -c "lua package.loaded.plantuml = nil; package.loaded['plantuml.docker'] = nil" \
+    -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = $TEST_HTTP_PORT}); p.start()" &
 NVIM_PID=$!
+track_pid "$NVIM_PID"
 echo "Neovim started with PID: $NVIM_PID"
 
-# Verify both servers are running before proceeding
-echo "Verifying servers are ready..."
-for i in {1..10}; do
-    if netstat -ln | grep ":8764" && netstat -ln | grep ":8765"; then
-        echo "Both servers are listening"
-        break
-    fi
-    if [ $i -eq 10 ]; then
-        echo "Servers not ready after 10 seconds"
-        netstat -ln | grep ":876" || true
-        exit 1
-    fi
-    # Shorter sleep interval for faster detection
-    sleep 0.5
-done
+# Wait for health endpoint to report ready
+if ! wait_for_health 10; then
+    echo "✗ Server failed to become ready"
+    exit 1
+fi
+echo "✓ Server is ready"
 
-# Cleanup function
-cleanup() {
-    echo "Cleaning up..."
-    # Skip graceful shutdown for speed - just force kill
-    kill $NVIM_PID 2>/dev/null || true
-    wait $NVIM_PID 2>/dev/null || true
-}
-trap cleanup EXIT
+# Test 1: Health endpoint returns valid JSON
+echo "Test 1: Health endpoint returns valid state"
+HEALTH_RESPONSE=$(curl -sf "http://127.0.0.1:${TEST_HTTP_PORT}/health")
+if echo "$HEALTH_RESPONSE" | grep -q '"state":"ready"'; then
+    echo "✓ Health endpoint returns ready state"
+else
+    echo "✗ Health endpoint response invalid: $HEALTH_RESPONSE"
+    exit 1
+fi
 
-# Create WebSocket test script  
-cat > /tmp/websocket_test.js << EOF
+# Test 2: WebSocket connection and handshake
+echo "Test 2: WebSocket connection and handshake"
+cat > "$TEST_TMP_DIR/websocket_test.js" << EOF
 const WebSocket = require('$(pwd)/node_modules/ws');
 
 function testWebSocket() {
     return new Promise((resolve, reject) => {
-        const ws = new WebSocket('ws://127.0.0.1:8765');
-        let results = {
+        const ws = new WebSocket('ws://127.0.0.1:${TEST_WS_PORT}');
+        const results = {
             connected: false,
             handshake: false,
             canSendMessage: false,
-            receivedResponse: false
+            receivedResponse: false,
+            responseType: null
         };
-        
+
+        const timeout = setTimeout(() => {
+            ws.close();
+            resolve(results);
+        }, 5000);
+
         ws.on('open', () => {
             console.log('WebSocket connected');
             results.connected = true;
             results.handshake = true;
-            
-            // Test sending a refresh message
+
             try {
                 ws.send(JSON.stringify({type: 'refresh'}));
                 results.canSendMessage = true;
@@ -64,69 +71,92 @@ function testWebSocket() {
                 console.error('Failed to send message:', err);
             }
         });
-        
+
         ws.on('message', (data) => {
             console.log('Received message:', data.toString());
             try {
                 const message = JSON.parse(data.toString());
-                if (message.type) {
-                    results.receivedResponse = true;
-                }
-            } catch (err) {
-                console.log('Message parsing failed, but message received');
                 results.receivedResponse = true;
+                results.responseType = message.type;
+                // Got response, we can close now
+                clearTimeout(timeout);
+                ws.close();
+            } catch (err) {
+                console.log('Message parsing failed');
             }
         });
-        
+
         ws.on('error', (err) => {
-            console.error('WebSocket error:', err);
+            console.error('WebSocket error:', err.message);
+            clearTimeout(timeout);
             reject(err);
         });
-        
+
         ws.on('close', () => {
-            console.log('WebSocket closed');
+            clearTimeout(timeout);
             resolve(results);
         });
-        
-        // Close after 500ms - enough time for handshake and message exchange
-        setTimeout(() => {
-            ws.close();
-            // Force exit after a short delay if close event doesn't fire
-            setTimeout(() => {
-                resolve(results);
-            }, 100);
-        }, 500);
     });
 }
 
 testWebSocket().then(results => {
     console.log('Test results:', JSON.stringify(results, null, 2));
-    // Force immediate exit to prevent event loop hanging
-    const exitCode = results.connected && results.handshake ? 0 : 1;
-    setTimeout(() => process.exit(exitCode), 50);
+    const success = results.connected && results.handshake && results.receivedResponse;
+    process.exit(success ? 0 : 1);
 }).catch(err => {
     console.error('Test failed:', err);
-    setTimeout(() => process.exit(1), 50);
+    process.exit(1);
 });
 EOF
 
-# Test 1: WebSocket server is listening on port 8765
-echo "Test 1: WebSocket server is listening on port 8765"
-if netstat -ln | grep ":8765"; then
-    echo "✓ WebSocket server listening on port 8765"
-else
-    echo "✗ WebSocket server not listening on port 8765"
-    # Try to get more info
-    netstat -ln | grep ":876" || true
-    exit 1
-fi
-
-# Test 2: WebSocket connection and handshake
-echo "Test 2: WebSocket connection and handshake"
-if node /tmp/websocket_test.js 2>&1; then
+if node "$TEST_TMP_DIR/websocket_test.js" 2>&1; then
     echo "✓ WebSocket connection and handshake successful"
 else
     echo "✗ WebSocket connection or handshake failed"
+    exit 1
+fi
+
+# Test 3: Server always responds to refresh (even without diagram)
+echo "Test 3: Server responds to refresh with status"
+cat > "$TEST_TMP_DIR/refresh_test.js" << EOF
+const WebSocket = require('$(pwd)/node_modules/ws');
+
+const ws = new WebSocket('ws://127.0.0.1:${TEST_WS_PORT}');
+const timeout = setTimeout(() => {
+    console.error('Timeout waiting for response');
+    process.exit(1);
+}, 5000);
+
+ws.on('open', () => {
+    ws.send(JSON.stringify({type: 'refresh'}));
+});
+
+ws.on('message', (data) => {
+    clearTimeout(timeout);
+    const msg = JSON.parse(data.toString());
+    // Should receive either a status or update message
+    if (msg.type === 'status' || msg.type === 'update') {
+        console.log('Received valid response:', msg.type);
+        ws.close();
+        process.exit(0);
+    } else {
+        console.error('Unexpected message type:', msg.type);
+        ws.close();
+        process.exit(1);
+    }
+});
+
+ws.on('error', (err) => {
+    clearTimeout(timeout);
+    console.error('Error:', err.message);
+    process.exit(1);
+});
+EOF
+
+if node "$TEST_TMP_DIR/refresh_test.js" 2>&1; then
+    echo "✓ Server responds to refresh request"
+else
+    echo "✗ Server did not respond to refresh"
     exit 1
 fi
 

@@ -70,8 +70,9 @@ print("✓ Container status check (not_found) passed")
 print("All Docker API tests passed")
 EOF
 
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 nvim --headless --clean \
-    -u ~/.config/nvim/init.lua \
+    -c "lua vim.opt.runtimepath:prepend('$PLUGIN_DIR')" \
     -c "luafile /tmp/test_docker_api.lua" \
     -c "qall!" 2>&1
 
@@ -149,7 +150,7 @@ print("All Docker lifecycle tests passed")
 EOF
 
 nvim --headless --clean \
-    -u ~/.config/nvim/init.lua \
+    -c "lua vim.opt.runtimepath:prepend('$PLUGIN_DIR')" \
     -c "luafile /tmp/test_docker_lifecycle.lua" \
     -c "qall!" 2>&1
 
@@ -311,7 +312,7 @@ print("All container reuse tests passed")
 EOF
 
 nvim --headless --clean \
-    -u ~/.config/nvim/init.lua \
+    -c "lua vim.opt.runtimepath:prepend('$PLUGIN_DIR')" \
     -c "luafile /tmp/test_container_reuse.lua" \
     -c "qall!" 2>&1
 

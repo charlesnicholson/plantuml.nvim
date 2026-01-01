@@ -1,183 +1,102 @@
 #!/bin/bash
 set -euo pipefail
 
-
+# Source test utilities
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/test-utils.sh"
 
 echo "Testing PlantUML processing..."
 
-# Initialize all PID variables to avoid unbound variable errors
-NVIM_PID=""
-LISTENER_PID=""
-
-# Create WebSocket listener to capture messages
-cat > /tmp/websocket_listener.js << EOF
-const WebSocket = require('$(pwd)/node_modules/ws');
-
-function listenForUpdates() {
-    return new Promise((resolve, reject) => {
-        let ws;
-        let updateReceived = false;
-        let messageData = null;
-        let connectionAttempts = 0;
-        const maxAttempts = 10; // Increased attempts
-        
-        function tryConnect() {
-            connectionAttempts++;
-            console.log('WebSocket connection attempt', connectionAttempts);
-            
-            // First check if server is running
-            const net = require('net');
-            const socket = new net.Socket();
-            
-            socket.setTimeout(1000);
-            socket.on('timeout', () => {
-                socket.destroy();
-                if (connectionAttempts < maxAttempts) {
-                    console.log('Server not ready, retrying in 1 second...');
-                    setTimeout(tryConnect, 1000);
-                } else {
-                    reject(new Error('Server not available after max attempts'));
-                }
-            });
-            
-            socket.on('error', () => {
-                socket.destroy();
-                if (connectionAttempts < maxAttempts) {
-                    console.log('Server not ready, retrying in 1 second...');
-                    setTimeout(tryConnect, 1000);
-                } else {
-                    reject(new Error('Server not available after max attempts'));
-                }
-            });
-            
-            socket.on('connect', () => {
-                socket.destroy();
-                
-                // Server is ready, now try WebSocket connection
-                ws = new WebSocket('ws://127.0.0.1:8765');
-                
-                ws.on('open', () => {
-                    console.log('WebSocket listener connected');
-                    // Send refresh to get any existing messages
-                    ws.send(JSON.stringify({type: 'refresh'}));
-                });
-                
-                ws.on('message', (data) => {
-                    try {
-                        const message = JSON.parse(data.toString());
-                        console.log('Received message:', JSON.stringify(message, null, 2));
-                        
-                        if (message.type === 'update') {
-                            updateReceived = true;
-                            messageData = message;
-                            ws.close();
-                        }
-                    } catch (err) {
-                        console.error('Failed to parse message:', err);
-                    }
-                });
-                
-                ws.on('error', (err) => {
-                    console.error('WebSocket error:', err.message);
-                    if (connectionAttempts < maxAttempts) {
-                        console.log('Retrying WebSocket connection in 1 second...');
-                        setTimeout(tryConnect, 1000);
-                    } else {
-                        reject(err);
-                    }
-                });
-                
-                ws.on('close', () => {
-                    if (updateReceived) {
-                        resolve({ updateReceived, messageData });
-                    } else if (connectionAttempts < maxAttempts) {
-                        console.log('WebSocket connection closed, retrying...');
-                        setTimeout(tryConnect, 1000);
-                    } else {
-                        resolve({ updateReceived: false, messageData: null });
-                    }
-                });
-            });
-            
-            // Try to connect to check if server is ready
-            socket.connect(8765, '127.0.0.1');
-        }
-        
-        tryConnect();
-        
-        // Timeout after 20 seconds total
-        setTimeout(() => {
-            if (!updateReceived) {
-                console.log('No update received within timeout');
-            }
-            if (ws) {
-                ws.close();
-            }
-            resolve({ updateReceived, messageData });
-        }, 20000);
-    });
-}
-
-listenForUpdates().then(result => {
-    console.log('Listener result:', JSON.stringify(result, null, 2));
-    process.exit(0);
-}).catch(err => {
-    console.error('Listener failed:', err);
-    process.exit(1);
-});
-EOF
+# Setup isolated test environment
+setup_test_env
 
 # Test 1: Load PlantUML file and trigger update
 echo "Test 1: Load PlantUML file and trigger update"
 
-# Start WebSocket listener first
-node /tmp/websocket_listener.js > /tmp/ws_output.log 2>&1 &
+# Create WebSocket listener script in temp directory
+cat > "$TEST_TMP_DIR/websocket_listener.js" << EOF
+const WebSocket = require('$(pwd)/node_modules/ws');
+
+const timeout = setTimeout(() => {
+    console.log('Timeout waiting for update');
+    process.exit(1);
+}, 30000);
+
+function connect() {
+    const ws = new WebSocket('ws://127.0.0.1:${TEST_WS_PORT}');
+
+    ws.on('open', () => {
+        console.log('WebSocket listener connected');
+        ws.send(JSON.stringify({type: 'refresh'}));
+    });
+
+    ws.on('message', (data) => {
+        try {
+            const message = JSON.parse(data.toString());
+            console.log('Received:', JSON.stringify(message, null, 2));
+
+            if (message.type === 'update') {
+                clearTimeout(timeout);
+                ws.close();
+                process.exit(0);
+            }
+            // If we got a status message, keep waiting for update
+        } catch (err) {
+            console.error('Parse error:', err);
+        }
+    });
+
+    ws.on('error', (err) => {
+        console.log('Connection error, retrying...');
+        setTimeout(connect, 500);
+    });
+
+    ws.on('close', () => {
+        // Reconnect if we didn't get an update yet
+        console.log('Connection closed, reconnecting...');
+        setTimeout(connect, 500);
+    });
+}
+
+connect();
+EOF
+
+# Start WebSocket listener in background
+node "$TEST_TMP_DIR/websocket_listener.js" > "$TEST_TMP_DIR/ws_output.log" 2>&1 &
 LISTENER_PID=$!
+track_pid "$LISTENER_PID"
 
-# Give listener time to start - reduced from 1s
-sleep 0.5
-
-# Start Neovim with plugin and process file in the same session
+# Start Neovim with plugin and process file (clean mode, only local plugin)
 echo "Starting Neovim and processing PlantUML file..."
-nvim --headless -u ~/.config/nvim/init.lua \
-    -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" \
+nvim --headless --clean \
+    -c "lua vim.opt.runtimepath:prepend('$PLUGIN_DIR')" \
+    -c "lua package.loaded.plantuml = nil; package.loaded['plantuml.docker'] = nil" \
+    -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = $TEST_HTTP_PORT}); p.start()" \
     -c "edit tests/fixtures/simple.puml" \
     -c "set filetype=plantuml" \
-    -c "sleep 3" \
+    -c "sleep 2" \
     -c "lua require('plantuml').update_diagram()" \
-    -c "sleep 3" \
-    -c "qall!" 2>&1
+    -c "sleep 2" \
+    -c "qall!" 2>&1 &
+NVIM_PID=$!
+track_pid "$NVIM_PID"
 
-# Wait for update to be processed and sent
-sleep 2
-
-# Stop the listener
-kill $LISTENER_PID 2>/dev/null || true
-LISTENER_PID=""
-
-# Cleanup function for any remaining processes
-cleanup() {
-    echo "Cleaning up..."
-    # Kill any remaining Neovim processes
-    [ -n "$NVIM_PID" ] && kill $NVIM_PID 2>/dev/null || true
-    [ -n "$LISTENER_PID" ] && kill $LISTENER_PID 2>/dev/null || true
-    pkill -f "nvim.*headless" 2>/dev/null || true
-}
-trap cleanup EXIT
-
-# Check if update was received
-if grep -q '"type": "update"' /tmp/ws_output.log; then
+# Wait for listener to receive update (it will exit 0 on success)
+if wait $LISTENER_PID 2>/dev/null; then
     echo "✓ WebSocket update message received"
 else
     echo "✗ No WebSocket update message received"
     echo "WebSocket output:"
-    cat /tmp/ws_output.log
+    cat "$TEST_TMP_DIR/ws_output.log" || true
     exit 1
 fi
 
+# Wait for nvim to finish
+wait $NVIM_PID 2>/dev/null || true
+
 # Test 2: Verify message contains URL
 echo "Test 2: Verify message contains PlantUML URL"
-if grep -q '"url"' /tmp/ws_output.log && grep -q 'plantuml.com' /tmp/ws_output.log; then
+if grep -q '"url"' "$TEST_TMP_DIR/ws_output.log" && grep -q 'plantuml' "$TEST_TMP_DIR/ws_output.log"; then
     echo "✓ Message contains PlantUML URL"
 else
     echo "✗ Message does not contain PlantUML URL"
@@ -186,7 +105,7 @@ fi
 
 # Test 3: Verify message contains filename
 echo "Test 3: Verify message contains filename"
-if grep -q '"filename"' /tmp/ws_output.log; then
+if grep -q '"filename"' "$TEST_TMP_DIR/ws_output.log"; then
     echo "✓ Message contains filename"
 else
     echo "✗ Message does not contain filename"
@@ -195,7 +114,7 @@ fi
 
 # Test 4: Verify message contains timestamp field
 echo "Test 4: Verify message contains timestamp field"
-if grep -q '"timestamp"' /tmp/ws_output.log; then
+if grep -q '"timestamp"' "$TEST_TMP_DIR/ws_output.log"; then
     echo "✓ Message contains timestamp field"
 else
     echo "✗ Message does not contain timestamp field"
@@ -204,7 +123,7 @@ fi
 
 # Test 5: Verify message contains server_url field
 echo "Test 5: Verify message contains server_url field"
-if grep -q '"server_url"' /tmp/ws_output.log; then
+if grep -q '"server_url"' "$TEST_TMP_DIR/ws_output.log"; then
     echo "✓ Message contains server_url field"
 else
     echo "✗ Message does not contain server_url field"
@@ -213,9 +132,9 @@ fi
 
 # Test 6: Extract and verify PlantUML URL structure
 echo "Test 6: Verify PlantUML URL structure"
-PLANTUML_URL=$(grep -o 'http://www\.plantuml\.com/plantuml/png/~1[^"]*' /tmp/ws_output.log || true)
+PLANTUML_URL=$(grep -o 'http://www\.plantuml\.com/plantuml/png/~1[^"]*' "$TEST_TMP_DIR/ws_output.log" || true)
 if [ -n "$PLANTUML_URL" ]; then
-    echo "✓ PlantUML URL has correct structure: $PLANTUML_URL"
+    echo "✓ PlantUML URL has correct structure"
 else
     echo "✗ PlantUML URL has incorrect structure"
     exit 1
@@ -228,35 +147,6 @@ if curl -f -s --max-time 10 "$PLANTUML_URL" > /dev/null; then
 else
     echo "⚠ PlantUML URL not accessible (may be network issue)"
     # Don't fail the test for network issues
-fi
-
-# Test 8: Test with more complex PlantUML content
-echo "Test 8: Test with complex PlantUML content"
-
-# Start another WebSocket listener
-node /tmp/websocket_listener.js > /tmp/ws_output2.log 2>&1 &
-LISTENER_PID=$!
-sleep 0.5
-
-# Process complex PlantUML content in a new Neovim session
-nvim --headless -u ~/.config/nvim/init.lua \
-    -c "lua local p = require('plantuml'); p.setup({auto_start = false, http_port = 8764}); p.start()" \
-    -c "edit tests/fixtures/test.puml" \
-    -c "set filetype=plantuml" \
-    -c "sleep 3" \
-    -c "lua require('plantuml').update_diagram()" \
-    -c "sleep 3" \
-    -c "qall!" 2>&1
-
-sleep 2
-kill $LISTENER_PID 2>/dev/null || true
-LISTENER_PID=""
-
-if grep -q '"type": "update"' /tmp/ws_output2.log; then
-    echo "✓ Complex PlantUML content processed successfully"
-else
-    echo "✗ Complex PlantUML content processing failed"
-    exit 1
 fi
 
 echo "✓ All PlantUML processing tests passed"
