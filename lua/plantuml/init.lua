@@ -153,6 +153,7 @@ end
 local server = {}
 local connected_clients = {}
 local browser_launched_this_session = false
+local browser_launch_pending = false
 local last_message = nil
 local http_server = nil
 local ws_server = nil
@@ -429,6 +430,7 @@ function server.start()
                   "Sec-WebSocket-Accept: " .. accept_key_b64 .. "\r\n\r\n"
               client:write(response)
               connected_clients[client] = true
+              browser_launch_pending = false -- Client connected, clear the lock
               handshake_done = true
               handshake_buffer = nil -- Free memory
             end
@@ -779,13 +781,29 @@ function M.update_diagram()
     server_url = server_url
   })
 
-  if not has_connected_clients() and current_state ~= STATE.STOPPED then
-    if config.auto_launch_browser == "always" then
-      M.open_browser()
-    elseif config.auto_launch_browser == "once" and not browser_launched_this_session then
-      M.open_browser()
-      browser_launched_this_session = true
-    end
+  M.maybe_launch_browser()
+end
+
+-- Helper to check and launch browser with lock to prevent duplicates
+function M.maybe_launch_browser()
+  if has_connected_clients() or current_state == STATE.STOPPED then
+    return
+  end
+  if browser_launch_pending then
+    return -- Browser launch in progress, waiting for connection
+  end
+
+  local should_launch = false
+  if config.auto_launch_browser == "always" then
+    should_launch = true
+  elseif config.auto_launch_browser == "once" and not browser_launched_this_session then
+    should_launch = true
+  end
+
+  if should_launch then
+    browser_launch_pending = true
+    M.open_browser()
+    browser_launched_this_session = true
   end
 end
 
@@ -816,6 +834,8 @@ local function try_start_docker()
         -- (user can use remote server)
         set_state(STATE.READY)
       end
+      -- Docker just became ready - check if we should open a browser
+      M.maybe_launch_browser()
     end)
   end)
 end
