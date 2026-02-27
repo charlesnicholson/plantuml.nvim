@@ -48,3 +48,4 @@ tests/logs/
 tests/screenshots/
 browser_test.js
 
+.claude
