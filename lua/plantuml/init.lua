@@ -81,6 +81,16 @@ local function server_url()
   return config.plantuml_server_url
 end
 
+-- Find the best update to replay for a client.
+-- Try the mapped filepath first; fall back to any available message.
+local function find_replay_message(fp)
+  if fp and last_messages[fp] then
+    return last_messages[fp]
+  end
+  local _, msg = next(last_messages)
+  return msg
+end
+
 local function clients_for_file(filepath)
   local ids = {}
   local map = file_clients[filepath]
@@ -178,40 +188,29 @@ local function start_docker_container(cb)
       return
     end
 
-    docker.get_container_status(DOCKER_CONTAINER_NAME, function(status)
-      if status == "running" then
-        vim.notify("[plantuml.nvim] Using existing PlantUML Docker container", vim.log.levels.INFO)
-        ws.broadcast({ type = "docker_status", status = "Using existing Docker container", completed = true })
-        cb(true)
-        return
-      end
+    ws.broadcast({ type = "docker_status", status = "Starting Docker container..." })
 
-      local action = status == "stopped" and "Restarting" or "Starting"
-      vim.notify("[plantuml.nvim] " .. action .. " PlantUML Docker container...", vim.log.levels.INFO)
-      ws.broadcast({ type = "docker_status", status = action .. " Docker container..." })
+    docker.start_container(
+      DOCKER_CONTAINER_NAME, config.docker_image, config.docker_port, 8080,
+      function(ok)
+        if not ok then
+          ws.broadcast({ type = "docker_status", status = "Failed to start container", error = true })
+          cb(false, "Failed to start Docker container")
+          return
+        end
 
-      docker.start_container(
-        DOCKER_CONTAINER_NAME, config.docker_image, config.docker_port, 8080,
-        function(ok)
-          if not ok then
-            ws.broadcast({ type = "docker_status", status = "Failed to start container", error = true })
-            cb(false, "Failed to start Docker container")
+        ws.broadcast({ type = "docker_status", status = "Waiting for container to be ready..." })
+        docker.wait_for_ready(DOCKER_CONTAINER_NAME, 30, function(ready, err)
+          if not ready then
+            ws.broadcast({ type = "docker_status", status = "Container failed to be ready", error = true })
+            cb(false, "Docker container not ready: " .. (err or "timeout"))
             return
           end
-
-          ws.broadcast({ type = "docker_status", status = "Waiting for container to be ready..." })
-          docker.wait_for_ready(DOCKER_CONTAINER_NAME, 30, function(ready, err)
-            if not ready then
-              ws.broadcast({ type = "docker_status", status = "Container failed to be ready", error = true })
-              cb(false, "Docker container not ready: " .. (err or "timeout"))
-              return
-            end
-            vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
-            ws.broadcast({ type = "docker_status", status = "Docker container ready", completed = true })
-            cb(true)
-          end)
+          vim.notify("[plantuml.nvim] PlantUML Docker container is ready", vim.log.levels.INFO)
+          ws.broadcast({ type = "docker_status", status = "Docker container ready", completed = true })
+          cb(true)
         end)
-    end)
+      end)
   end)
 end
 
@@ -280,8 +279,11 @@ local function on_ws_connect(client_id)
   ws.send(client_id, status_msg)
 
   -- Replay last message if READY
-  if current_state == STATE.READY and last_messages[fp] then
-    ws.send(client_id, last_messages[fp])
+  if current_state == STATE.READY then
+    local msg = find_replay_message(fp)
+    if msg then
+      ws.send(client_id, msg)
+    end
   end
 end
 
@@ -297,8 +299,11 @@ local function on_ws_message(client_id, raw)
       has_diagram = next(last_messages) ~= nil,
     }
     ws.send(client_id, status_msg)
-    if current_state == STATE.READY and fp and last_messages[fp] then
-      ws.send(client_id, last_messages[fp])
+    if current_state == STATE.READY then
+      local replay = find_replay_message(fp)
+      if replay then
+        ws.send(client_id, replay)
+      end
     end
   end
 end
@@ -381,10 +386,12 @@ function M.start()
         return
       end
       set_state(STATE.DOCKER_PENDING)
-      start_docker_container(function()
+      start_docker_container(function(ok)
         set_state(STATE.READY)
         on_state_ready()
-        M.maybe_launch_browser()
+        if ok then
+          M.maybe_launch_browser()
+        end
       end)
     end)
   else

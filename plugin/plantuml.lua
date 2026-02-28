@@ -19,6 +19,18 @@ vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost", "BufEnter", "TabEnt
   desc = "Update PlantUML diagram on file events for plantuml files",
 })
 
+-- Handle lazy-loading: if the current buffer is already a plantuml file when
+-- the plugin loads, BufReadPost/BufEnter already fired and our autocmd missed it.
+-- Schedule an update so it runs after setup() completes.
+if vim.bo.filetype == "plantuml" then
+  vim.schedule(function()
+    local current_config = plantuml.get_config()
+    if current_config.auto_update then
+      plantuml.update_diagram()
+    end
+  end)
+end
+
 vim.api.nvim_create_user_command("PlantumlUpdate", function()
   plantuml.update_diagram()
 end, { desc = "Manually trigger PlantUML update" })
