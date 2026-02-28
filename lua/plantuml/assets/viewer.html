@@ -163,17 +163,22 @@
       max-width: 100%;
       max-height: 100%;
       cursor: pointer;
+      user-select: none;
+      -webkit-user-drag: none;
     }
 
     .board.zoom-pan-mode {
-      cursor: move;
+      cursor: grab;
+    }
+
+    .board.zoom-pan-mode.dragging {
+      cursor: grabbing;
     }
 
     .board.zoom-pan-mode #img {
       max-width: none;
       max-height: none;
-      cursor: move;
-      transition: transform 0.1s ease-out;
+      cursor: inherit;
     }
 
     .board.has-diagram #img {
@@ -211,11 +216,11 @@
     </div>
   </div>
   <script>
-    const ZOOM_SCALE = 0.8;
     const FALLBACK_WIDTH = 200;
     const MAX_URL_DISPLAY = 70;
     const DOCKER_STATUS_DELAY = 1500;
     const RECONNECT_DELAY = 1000;
+    const CLICK_THRESHOLD = 5; // px: distinguish click from drag
 
     const statusEl = document.getElementById("status");
     const statusText = document.getElementById("status-text");
@@ -233,8 +238,13 @@
     window.currentFilename = "";
 
     let isZoomPanMode = false;
-    let panX = 0.5; // 0 = show left edge, 0.5 = center, 1 = show right edge
-    let panY = 0.5;
+    let panX = 0; // pixel offset of image from centered position
+    let panY = 0;
+    let isDragging = false;
+    let dragStartMouseX = 0;
+    let dragStartMouseY = 0;
+    let dragStartPanX = 0;
+    let dragStartPanY = 0;
 
     function setStatus(kind, text) {
       statusEl.className = 'pill';
@@ -302,103 +312,137 @@
     function isImageMinified() {
       if (!img.naturalWidth || !img.naturalHeight) return false;
       const boardRect = board.getBoundingClientRect();
-      const availableWidth = boardRect.width;
-      const availableHeight = boardRect.height;
-
-      return img.naturalWidth > availableWidth || img.naturalHeight > availableHeight;
+      return img.naturalWidth > boardRect.width || img.naturalHeight > boardRect.height;
     }
 
     function resetZoomPan() {
       isZoomPanMode = false;
-      panX = 0.5;
-      panY = 0.5;
-      board.classList.remove('zoom-pan-mode');
-      updateImageTransform();
+      isDragging = false;
+      panX = 0;
+      panY = 0;
+      board.classList.remove('zoom-pan-mode', 'dragging');
+      img.style.transform = '';
     }
 
-    function enterZoomPanMode() {
+    // Enter zoom-pan mode, centering on the click point.
+    // clickX/clickY are relative to the board.
+    function enterZoomPanMode(clickX, clickY) {
+      const boardRect = board.getBoundingClientRect();
+
+      // Current displayed size of the image (fit-to-screen)
+      const displayedWidth = img.clientWidth;
+      const displayedHeight = img.clientHeight;
+
+      // Where the click falls on the image in natural-pixel coordinates
+      // The image is centered in the board by flexbox.
+      const imgLeft = (boardRect.width - displayedWidth) / 2;
+      const imgTop = (boardRect.height - displayedHeight) / 2;
+      const relX = clickX - imgLeft;
+      const relY = clickY - imgTop;
+
+      // Fraction of the image that was clicked
+      const fracX = relX / displayedWidth;
+      const fracY = relY / displayedHeight;
+
+      // In zoom-pan mode the image is at natural size, centered by default (panX=panY=0).
+      // We want the point at (fracX, fracY) of the natural image to appear where the mouse is.
+      // Natural image center is at board center when pan=0.
+      // The clicked point in natural coords relative to image center:
+      const natOffsetX = (fracX - 0.5) * img.naturalWidth;
+      const natOffsetY = (fracY - 0.5) * img.naturalHeight;
+
+      // We need translate so that point ends up at (clickX, clickY) in board coords.
+      // Board center is at (boardRect.width/2, boardRect.height/2).
+      // Without translate, the point is at (boardCenter + natOffset).
+      // With translate (panX, panY), it's at (boardCenter + natOffset + panX, ...).
+      // We want: boardCenter + natOffset + panX = clickX
+      panX = (clickX - boardRect.width / 2) - natOffsetX;
+      panY = (clickY - boardRect.height / 2) - natOffsetY;
+
+      clampPan();
       isZoomPanMode = true;
       board.classList.add('zoom-pan-mode');
       updateImageTransform();
     }
 
+    // Clamp pan so the image doesn't scroll past its edges.
+    function clampPan() {
+      const boardRect = board.getBoundingClientRect();
+      const maxPanX = Math.max(0, (img.naturalWidth - boardRect.width) / 2);
+      const maxPanY = Math.max(0, (img.naturalHeight - boardRect.height) / 2);
+      panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+      panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+    }
+
     function updateImageTransform() {
       if (isZoomPanMode) {
-        const boardRect = board.getBoundingClientRect();
-
-        // Zoomed image dimensions (80% of natural size)
-        const zoomedWidth = img.naturalWidth * ZOOM_SCALE;
-        const zoomedHeight = img.naturalHeight * ZOOM_SCALE;
-
-        // How much the zoomed image exceeds the viewport
-        const excessWidth = zoomedWidth - boardRect.width;
-        const excessHeight = zoomedHeight - boardRect.height;
-
-        // Calculate translation to show the desired portion
-        // panX: 0 = left edge, 0.5 = center, 1 = right edge
-        // With transform-origin: center, the image center starts at board center
-        // translateX > 0 moves image right (shows left side)
-        // translateX < 0 moves image left (shows right side)
-        let translateX = 0;
-        let translateY = 0;
-
-        if (excessWidth > 0) {
-          translateX = excessWidth * (0.5 - panX);
-        }
-        // If excessWidth <= 0, image fits horizontally, keep centered
-
-        if (excessHeight > 0) {
-          translateY = excessHeight * (0.5 - panY);
-        }
-        // If excessHeight <= 0, image fits vertically, keep centered
-
-        img.style.transformOrigin = 'center';
-        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${ZOOM_SCALE})`;
+        img.style.transform = `translate(${panX}px, ${panY}px)`;
       } else {
         img.style.transform = '';
-        img.style.transformOrigin = '';
       }
     }
 
-    function updatePanFromMouseEvent(e) {
-      const boardRect = board.getBoundingClientRect();
-      // Map mouse position to 0-1 range
-      // Mouse at left edge → panX = 0 → show left of image
-      // Mouse at right edge → panX = 1 → show right of image
-      panX = (e.clientX - boardRect.left) / boardRect.width;
-      panY = (e.clientY - boardRect.top) / boardRect.height;
-      // Clamp to valid range
-      panX = Math.max(0, Math.min(1, panX));
-      panY = Math.max(0, Math.min(1, panY));
-    }
+    // --- Event handlers ---
 
-    function handleImageClick(e) {
+    function handleBoardMouseDown(e) {
       if (!hasLoadedDiagram) return;
+      if (e.button !== 0) return; // left button only
 
-      if (isImageMinified()) {
-        if (isZoomPanMode) {
-          resetZoomPan();
-        } else {
-          updatePanFromMouseEvent(e);
-          enterZoomPanMode();
-        }
+      if (!isZoomPanMode) {
+        // In fit mode: only respond if image is larger than viewport
+        if (!isImageMinified()) return;
+        // Enter zoom-pan mode on mouseup if it's a clean click (handled below)
       }
-    }
 
-    function handleMouseMove(e) {
-      if (!isZoomPanMode) return;
-      updatePanFromMouseEvent(e);
-      updateImageTransform();
-    }
+      // Record drag start
+      isDragging = true;
+      dragStartMouseX = e.clientX;
+      dragStartMouseY = e.clientY;
+      dragStartPanX = panX;
+      dragStartPanY = panY;
 
-    function handleMouseDown(e) {
-      if (!isZoomPanMode) return;
+      if (isZoomPanMode) {
+        board.classList.add('dragging');
+      }
+
       e.preventDefault();
     }
 
-    img.addEventListener('click', handleImageClick);
-    board.addEventListener('mousemove', handleMouseMove);
-    board.addEventListener('mousedown', handleMouseDown);
+    function handleMouseMove(e) {
+      if (!isDragging) return;
+      if (!isZoomPanMode) return; // don't drag in fit mode
+
+      const dx = e.clientX - dragStartMouseX;
+      const dy = e.clientY - dragStartMouseY;
+      panX = dragStartPanX + dx;
+      panY = dragStartPanY + dy;
+      clampPan();
+      updateImageTransform();
+    }
+
+    function handleMouseUp(e) {
+      if (!isDragging) return;
+      isDragging = false;
+      board.classList.remove('dragging');
+
+      const dx = e.clientX - dragStartMouseX;
+      const dy = e.clientY - dragStartMouseY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < CLICK_THRESHOLD) {
+        // This was a click, not a drag
+        if (isZoomPanMode) {
+          resetZoomPan();
+        } else if (isImageMinified()) {
+          const boardRect = board.getBoundingClientRect();
+          enterZoomPanMode(e.clientX - boardRect.left, e.clientY - boardRect.top);
+        }
+      }
+    }
+
+    board.addEventListener('mousedown', handleBoardMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
 
     function wsPort() {
       const p = parseInt(location.port || "0", 10);
