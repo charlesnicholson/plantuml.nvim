@@ -46,13 +46,51 @@ function M.get_container_status(name, cb)
     end)
 end
 
+local function get_host_port(name, cb)
+  run({
+    docker_cmd(), "inspect", name,
+    "--format", "{{(index (index .NetworkSettings.Ports \"8080/tcp\") 0).HostPort}}",
+  }, function(ok, stdout)
+    if ok then
+      cb(stdout:match("(%d+)"))
+    else
+      cb(nil)
+    end
+  end)
+end
+
+local function recreate_container(name, image, host_port, container_port, cb)
+  run({ docker_cmd(), "rm", "-f", name }, function()
+    run({
+      docker_cmd(), "run", "-d",
+      "--name", name,
+      "-p", host_port .. ":" .. container_port,
+      image,
+    }, function(ok)
+      cb(ok)
+    end)
+  end)
+end
+
 function M.start_container(name, image, host_port, container_port, cb)
   M.get_container_status(name, function(status)
     if status == "running" then
-      cb(true)
+      get_host_port(name, function(actual_port)
+        if actual_port == tostring(host_port) then
+          cb(true)
+        else
+          recreate_container(name, image, host_port, container_port, cb)
+        end
+      end)
     elseif status == "stopped" then
-      run({ docker_cmd(), "start", name }, function(ok)
-        cb(ok)
+      get_host_port(name, function(actual_port)
+        if actual_port == tostring(host_port) then
+          run({ docker_cmd(), "start", name }, function(ok)
+            cb(ok)
+          end)
+        else
+          recreate_container(name, image, host_port, container_port, cb)
+        end
       end)
     else
       run({

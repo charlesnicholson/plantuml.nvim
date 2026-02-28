@@ -455,7 +455,7 @@
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        setStatus("ok", "Live");
+        setStatus("ok", "Connected");
         ws.send(JSON.stringify({type: "refresh"}));
       };
 
@@ -465,7 +465,7 @@
           if (data.type === "update" && data.url) {
             // Don't set hasLoadedDiagram here - only in img.onload to avoid race
             pendingImageLoad = true;
-            setStatus("warn", "Reloading...");
+            setStatus("warn", hasLoadedDiagram ? "Reloading..." : "Loading...");
             img.style.opacity = 0;
             resetZoomPan();
             if (data.filename) {
@@ -487,7 +487,7 @@
           } else if (data.type === "status") {
             // Handle server state messages
             if (data.state === "ready" && !pendingImageLoad) {
-              setStatus("ok", "Live");
+              setStatus("ok", hasLoadedDiagram ? "Live" : "Connected");
               // Reset placeholder to default message when ready
               ph.innerHTML = "Ready for a diagram.<br>Save a PlantUML file in Neovim to view it here.";
             } else if (data.state === "docker_unavailable") {
@@ -523,7 +523,7 @@
                 dockerStatusTimeoutId = setTimeout(() => {
                   dockerStatusTimeoutId = null;
                   if (!pendingImageLoad) {
-                    setStatus("ok", "Live");
+                    setStatus("ok", hasLoadedDiagram ? "Live" : "Connected");
                   }
                 }, DOCKER_STATUS_DELAY);
               }
